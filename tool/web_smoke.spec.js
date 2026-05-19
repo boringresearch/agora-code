@@ -117,3 +117,27 @@ test('mobile app opens without runtime errors', async ({ page }) => {
 
   expectNoRuntimeFailures(failures);
 });
+
+test('cinematic HTML demo opens and advances without runtime errors', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const failures = installRuntimeGuards(page);
+
+  await page.goto(`${baseUrl}/mind-agora-demo.html`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
+  await expect(page).toHaveTitle(/Mind Agora - Cinematic Demo/);
+  await expect(page.getByRole('button', { name: 'Start Demo' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Start Demo' }).click();
+  await page.waitForTimeout(800);
+  await expect(page.locator('[data-scene="0"].active .scene-subtitle')).toBeVisible();
+  await expectPainted(page, 'desktop-cinematic-demo-start');
+
+  await page.getByRole('button', { name: 'Next scene' }).click();
+  await page.waitForTimeout(800);
+  await expect(page.getByText('Maya Rodrigues')).toBeVisible();
+  await expectPainted(page, 'desktop-cinematic-demo-persona');
+
+  expectNoRuntimeFailures(failures);
+});
