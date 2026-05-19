@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../llm/llm_client.dart';
 import '../models/models.dart';
 import '../storage/local_store.dart';
-import '../theme/agora_theme.dart';
 import '../widgets/agora_background.dart';
 import '../widgets/nav.dart';
 import 'home_screen.dart';
@@ -71,7 +70,8 @@ class _AppShellState extends State<AppShell> {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: MobileBottomNav(selected: _selected, onSelected: _select),
+                    child: MobileBottomNav(
+                        selected: _selected, onSelected: _select),
                   ),
               ],
             );
@@ -83,8 +83,12 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildContent() {
     return switch (_selected) {
-      AppSection.home => HomeScreen(onOpenRoom: () => _openRoom(RoomMode.complex)),
-      AppSection.meetings => MeetingsScreen(store: widget.store, onOpenRoom: () => _openRoom(_roomMode)),
+      AppSection.home => HomeScreen(
+          store: widget.store,
+          onOpenRoom: () => _openRoom(RoomMode.complex),
+        ),
+      AppSection.meetings => MeetingsScreen(
+          store: widget.store, onOpenRoom: () => _openRoom(_roomMode)),
       AppSection.think => _liveRoomOpen
           ? LiveRoomScreen(
               initialMode: _roomMode,
@@ -95,7 +99,8 @@ class _AppShellState extends State<AppShell> {
           : ThinkRoomScreen(onBegin: _openRoom),
       AppSection.selfReflection => const PlaceholderScreen(
           title: 'Self-reflection',
-          subtitle: 'Journal prompts, memory cards, and private reflections will live here.',
+          subtitle:
+              'Journal prompts, memory cards, and private reflections will live here.',
           icon: Icons.explore_outlined,
         ),
       AppSection.saved => const PlaceholderScreen(
@@ -105,7 +110,8 @@ class _AppShellState extends State<AppShell> {
         ),
       AppSection.quotes => const PlaceholderScreen(
           title: 'Quotes',
-          subtitle: 'A living quote garden from your council and the public feed.',
+          subtitle:
+              'A living quote garden from your council and the public feed.',
           icon: Icons.format_quote_rounded,
         ),
       AppSection.thinkers => const PlaceholderScreen(
@@ -125,7 +131,8 @@ class _AppShellState extends State<AppShell> {
         ),
       AppSection.messages => const PlaceholderScreen(
           title: 'Messages',
-          subtitle: 'Private conversations with thinkers and invited collaborators.',
+          subtitle:
+              'Private conversations with thinkers and invited collaborators.',
           icon: Icons.mail_outline_rounded,
         ),
     };

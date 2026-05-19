@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../data/sample_data.dart';
 import '../models/models.dart';
+import '../storage/local_store.dart';
 import '../theme/agora_theme.dart';
 import '../widgets/logo.dart';
 import '../widgets/post_card.dart';
 import '../widgets/soft_card.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.onOpenRoom});
+  const HomeScreen({
+    super.key,
+    required this.store,
+    required this.onOpenRoom,
+  });
 
+  final LocalStore store;
   final VoidCallback onOpenRoom;
 
   @override
@@ -17,31 +23,40 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final List<FeedPost> _posts = List<FeedPost>.from(feedPosts);
+  static const _feedSeededSetting = 'feed.seeded.v1';
+
+  List<FeedPost> _posts = List<FeedPost>.from(feedPosts);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeedPosts();
+  }
 
   void _addPost(String body) {
+    final post = FeedPost(
+      id: 'user_post_${DateTime.now().microsecondsSinceEpoch}',
+      author: 'You',
+      handle: '@you',
+      timeLabel: 'now',
+      body: body,
+      avatarColor: AgoraColors.ink,
+      actionLabel: 'Ask a thinker',
+      createdAt: DateTime.now(),
+    );
     setState(() {
-      _posts.insert(
-        0,
-        FeedPost(
-          id: 'user_post_${DateTime.now().microsecondsSinceEpoch}',
-          author: 'You',
-          handle: '@you',
-          timeLabel: 'now',
-          body: body,
-          avatarColor: AgoraColors.ink,
-          actionLabel: 'Ask a thinker',
-        ),
-      );
+      _posts.insert(0, post);
     });
+    _savePost(post);
   }
 
   void _addComment(String postId, String body) {
+    FeedPost? updatedPost;
     setState(() {
       final index = _posts.indexWhere((post) => post.id == postId);
       if (index < 0) return;
       final post = _posts[index];
-      _posts[index] = post.copyWith(
+      updatedPost = post.copyWith(
         replies: post.replies + 1,
         comments: [
           ...post.comments,
@@ -51,10 +66,15 @@ class _HomeScreenState extends State<HomeScreen> {
             handle: '@you',
             body: body,
             timeLabel: 'now',
+            createdAt: DateTime.now(),
           ),
         ],
       );
+      _posts[index] = updatedPost!;
     });
+    if (updatedPost != null) {
+      _savePost(updatedPost!);
+    }
   }
 
   void _deletePost(String postId) {
@@ -69,6 +89,61 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+    _deleteStoredPost(postId);
+  }
+
+  Future<void> _loadFeedPosts() async {
+    try {
+      var posts = await widget.store.listFeedPosts();
+      if (posts.isEmpty) {
+        final wasSeeded = await widget.store.readSetting(_feedSeededSetting);
+        if (wasSeeded != 'true') {
+          posts = _seedPosts();
+          for (final post in posts) {
+            await widget.store.saveFeedPost(post);
+          }
+          await widget.store.saveSetting(_feedSeededSetting, 'true');
+        }
+      }
+      if (!mounted) return;
+      setState(() => _posts = posts);
+    } catch (error) {
+      debugPrint('Failed to load feed posts: $error');
+    }
+  }
+
+  List<FeedPost> _seedPosts() {
+    final now = DateTime.now();
+    return [
+      for (var i = 0; i < feedPosts.length; i++)
+        feedPosts[i].copyWith(createdAt: now.subtract(Duration(minutes: i)))
+    ];
+  }
+
+  Future<void> _savePost(FeedPost post) async {
+    try {
+      await widget.store.saveFeedPost(post);
+    } catch (error) {
+      debugPrint('Failed to save feed post: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not save post locally.'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1800),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteStoredPost(String postId) async {
+    try {
+      await widget.store.deleteFeedPost(postId);
+    } catch (error) {
+      debugPrint('Failed to delete feed post: $error');
+    }
   }
 
   @override

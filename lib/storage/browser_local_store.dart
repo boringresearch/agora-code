@@ -6,6 +6,7 @@ import 'local_store.dart';
 
 class BrowserLocalStore implements LocalStore {
   static const _roomsKey = 'mind_agora.rooms.v1';
+  static const _feedPostsKey = 'mind_agora.feed_posts.v1';
   static const _settingsKey = 'mind_agora.settings.v1';
   static const _messagePrefix = 'mind_agora.messages.';
 
@@ -75,6 +76,48 @@ class BrowserLocalStore implements LocalStore {
               jsonDecode(payload) as Map<String, dynamic>,
             ))
         .toList();
+  }
+
+  @override
+  Future<void> saveFeedPost(FeedPost post) async {
+    final rows = _readRows(_feedPostsKey);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final row = <String, Object?>{
+      'id': post.id,
+      'payload': jsonEncode(post.toJson()),
+      'created_at': post.createdAt?.millisecondsSinceEpoch ?? now,
+      'updated_at': now,
+    };
+    final index = rows.indexWhere((item) => item['id'] == post.id);
+    if (index >= 0) {
+      rows[index] = row;
+    } else {
+      rows.add(row);
+    }
+    rows.sort((a, b) =>
+        _intValue(b['created_at']).compareTo(_intValue(a['created_at'])));
+    _writeRows(_feedPostsKey, rows);
+  }
+
+  @override
+  Future<List<FeedPost>> listFeedPosts() async {
+    final rows = _readRows(_feedPostsKey)
+      ..sort((a, b) =>
+          _intValue(b['created_at']).compareTo(_intValue(a['created_at'])));
+    return rows
+        .map((row) => row['payload'])
+        .whereType<String>()
+        .map((payload) => FeedPost.fromJson(
+              jsonDecode(payload) as Map<String, dynamic>,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<void> deleteFeedPost(String postId) async {
+    final rows = _readRows(_feedPostsKey)
+      ..removeWhere((item) => item['id'] == postId);
+    _writeRows(_feedPostsKey, rows);
   }
 
   @override

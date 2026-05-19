@@ -436,6 +436,7 @@ class FeedPost {
     this.likes = 0,
     this.replies = 0,
     this.comments = const [],
+    this.createdAt,
   });
 
   final String id;
@@ -451,6 +452,7 @@ class FeedPost {
   final int likes;
   final int replies;
   final List<FeedComment> comments;
+  final DateTime? createdAt;
 
   FeedPost copyWith({
     String? id,
@@ -466,6 +468,7 @@ class FeedPost {
     int? likes,
     int? replies,
     List<FeedComment>? comments,
+    DateTime? createdAt,
   }) {
     return FeedPost(
       id: id ?? this.id,
@@ -481,6 +484,49 @@ class FeedPost {
       likes: likes ?? this.likes,
       replies: replies ?? this.replies,
       comments: comments ?? this.comments,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'author': author,
+        'handle': handle,
+        'timeLabel': timeLabel,
+        'body': body,
+        'avatarColor': avatarColor.toARGB32(),
+        'verified': verified,
+        'replyAuthor': replyAuthor,
+        'replyBody': replyBody,
+        'actionLabel': actionLabel,
+        'likes': likes,
+        'replies': replies,
+        'comments': comments.map((comment) => comment.toJson()).toList(),
+        'createdAt': createdAt?.toIso8601String(),
+      };
+
+  factory FeedPost.fromJson(Map<String, dynamic> json) {
+    return FeedPost(
+      id: json['id'] as String,
+      author: json['author'] as String? ?? 'You',
+      handle: json['handle'] as String? ?? '@you',
+      timeLabel: json['timeLabel'] as String? ?? 'now',
+      body: json['body'] as String? ?? '',
+      avatarColor:
+          Color(json['avatarColor'] as int? ?? AgoraColors.ink.toARGB32()),
+      verified: json['verified'] as bool? ?? false,
+      replyAuthor: json['replyAuthor'] as String?,
+      replyBody: json['replyBody'] as String?,
+      actionLabel: json['actionLabel'] as String?,
+      likes: json['likes'] as int? ?? 0,
+      replies: json['replies'] as int? ?? 0,
+      comments: (json['comments'] as List? ?? const [])
+          .whereType<Map>()
+          .map((comment) => FeedComment.fromJson(
+                Map<String, dynamic>.from(comment),
+              ))
+          .toList(),
+      createdAt: _dateOrNull(json['createdAt']),
     );
   }
 }
@@ -492,6 +538,7 @@ class FeedComment {
     required this.handle,
     required this.body,
     required this.timeLabel,
+    this.createdAt,
   });
 
   final String id;
@@ -499,6 +546,27 @@ class FeedComment {
   final String handle;
   final String body;
   final String timeLabel;
+  final DateTime? createdAt;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'author': author,
+        'handle': handle,
+        'body': body,
+        'timeLabel': timeLabel,
+        'createdAt': createdAt?.toIso8601String(),
+      };
+
+  factory FeedComment.fromJson(Map<String, dynamic> json) {
+    return FeedComment(
+      id: json['id'] as String,
+      author: json['author'] as String? ?? 'You',
+      handle: json['handle'] as String? ?? '@you',
+      body: json['body'] as String? ?? '',
+      timeLabel: json['timeLabel'] as String? ?? 'now',
+      createdAt: _dateOrNull(json['createdAt']),
+    );
+  }
 }
 
 class PromptSuggestion {

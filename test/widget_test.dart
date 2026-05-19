@@ -21,8 +21,9 @@ void main() {
 
   testWidgets('user can create a feed post and comment',
       (WidgetTester tester) async {
+    final store = _FakeLocalStore();
     await tester.pumpWidget(MindAgoraApp(
-      store: _FakeLocalStore(),
+      store: store,
       chatClient: FakeChatClient(),
     ));
     await tester.pumpAndSettle();
@@ -36,6 +37,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Post button test reflection'), findsOneWidget);
+    expect(store.storedFeedPosts.first.body, 'Post button test reflection');
 
     await tester.tap(find.widgetWithText(TextButton, 'Reply').first);
     await tester.pumpAndSettle();
@@ -49,6 +51,10 @@ void main() {
 
     expect(find.text('This comment can be posted now'), findsOneWidget);
     expect(find.text('1 replies'), findsOneWidget);
+    expect(
+      store.storedFeedPosts.first.comments.single.body,
+      'This comment can be posted now',
+    );
 
     await tester.tap(find.byTooltip('Post options').first);
     await tester.pumpAndSettle();
@@ -58,6 +64,11 @@ void main() {
     expect(find.text('Post button test reflection'), findsNothing);
     expect(find.text('This comment can be posted now'), findsNothing);
     expect(find.text('Post deleted.'), findsOneWidget);
+    expect(
+      store.storedFeedPosts
+          .where((post) => post.body == 'Post button test reflection'),
+      isEmpty,
+    );
   });
 
   test('seeded Think Room example dialogue is in English', () {
@@ -83,6 +94,7 @@ class _FakeLocalStore implements LocalStore {
   final List<RoomSession> sessions = <RoomSession>[];
   final Map<String, List<AgoraMessage>> messages =
       <String, List<AgoraMessage>>{};
+  final List<FeedPost> storedFeedPosts = <FeedPost>[];
   final Map<String, String> settings = <String, String>{};
 
   @override
@@ -97,11 +109,27 @@ class _FakeLocalStore implements LocalStore {
   }
 
   @override
+  Future<List<FeedPost>> listFeedPosts() async {
+    return List<FeedPost>.from(storedFeedPosts);
+  }
+
+  @override
   Future<String?> readSetting(String key) async => settings[key];
 
   @override
   Future<void> saveMessage(String roomId, AgoraMessage message) async {
     messages.putIfAbsent(roomId, () => <AgoraMessage>[]).add(message);
+  }
+
+  @override
+  Future<void> saveFeedPost(FeedPost post) async {
+    storedFeedPosts.removeWhere((item) => item.id == post.id);
+    storedFeedPosts.add(post);
+    storedFeedPosts.sort((a, b) {
+      final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
   }
 
   @override
@@ -113,5 +141,10 @@ class _FakeLocalStore implements LocalStore {
   @override
   Future<void> saveSetting(String key, String value) async {
     settings[key] = value;
+  }
+
+  @override
+  Future<void> deleteFeedPost(String postId) async {
+    storedFeedPosts.removeWhere((post) => post.id == postId);
   }
 }
