@@ -1,0 +1,17 @@
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.idea/
+.vscode/
+.DS_Store
+.env
+*.iml
+__pycache__/
+*.pyc
+node_modules/
+playwright-report/
+test-results/

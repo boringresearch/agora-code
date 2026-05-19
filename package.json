@@ -1,0 +1,12 @@
+{
+  "name": "mind-agora-flutter-web-tests",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test:web": "playwright test tool/web_smoke.spec.js --reporter=line"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "pngjs": "^7.0.0"
+  }
+}
