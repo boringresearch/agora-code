@@ -57,6 +57,20 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _deletePost(String postId) {
+    setState(() {
+      _posts.removeWhere((post) => post.id == postId);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Post deleted.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(milliseconds: 1600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -92,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 post: post,
                                 onAskThinker: widget.onOpenRoom,
                                 onReply: (body) => _addComment(post.id, body),
+                                onDelete: () => _deletePost(post.id),
                               ),
                             ),
                           ),

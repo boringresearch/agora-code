@@ -20,7 +20,8 @@ class ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
-    final bubbleColor = isUser ? AgoraColors.ink : Colors.white.withOpacity(0.96);
+    final bubbleColor =
+        isUser ? AgoraColors.ink : Colors.white.withOpacity(0.96);
     final textColor = isUser ? Colors.white : AgoraColors.ink2;
     final metaColor = isUser ? Colors.white.withOpacity(0.86) : AgoraColors.ink;
     final time = DateFormat('h:mm a').format(message.createdAt);
@@ -47,11 +48,13 @@ class ChatBubble extends StatelessWidget {
             const SizedBox(width: 12),
             Flexible(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                 decoration: BoxDecoration(
                   color: bubbleColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isUser ? AgoraColors.ink : AgoraColors.hair),
+                  border: Border.all(
+                      color: isUser ? AgoraColors.ink : AgoraColors.hair),
                   boxShadow: AgoraShadows.card,
                 ),
                 child: Directionality(
@@ -74,16 +77,21 @@ class ChatBubble extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: isUser ? Colors.white.withOpacity(0.12) : AgoraColors.canvas,
+                              color: isUser
+                                  ? Colors.white.withOpacity(0.12)
+                                  : AgoraColors.canvas,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               message.role,
                               style: bodyStyle(
                                 fontSize: 11,
-                                color: isUser ? Colors.white.withOpacity(0.84) : AgoraColors.inkSoft,
+                                color: isUser
+                                    ? Colors.white.withOpacity(0.84)
+                                    : AgoraColors.inkSoft,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -93,7 +101,9 @@ class ChatBubble extends StatelessWidget {
                             time,
                             style: bodyStyle(
                               fontSize: 11,
-                              color: isUser ? Colors.white.withOpacity(0.56) : AgoraColors.mute,
+                              color: isUser
+                                  ? Colors.white.withOpacity(0.56)
+                                  : AgoraColors.mute,
                             ),
                           ),
                         ],
@@ -101,7 +111,8 @@ class ChatBubble extends StatelessWidget {
                       const SizedBox(height: 7),
                       Text(
                         message.text,
-                        style: bodyStyle(fontSize: 15, height: 1.55, color: textColor),
+                        style: bodyStyle(
+                            fontSize: 15, height: 1.55, color: textColor),
                       ),
                     ],
                   ),
@@ -134,7 +145,10 @@ class AgendaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: active ? Colors.white : Colors.white.withOpacity(0.66),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: active ? AgoraColors.accent.withOpacity(0.52) : AgoraColors.hair),
+        border: Border.all(
+            color: active
+                ? AgoraColors.accent.withOpacity(0.52)
+                : AgoraColors.hair),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,7 +159,8 @@ class AgendaCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: active ? AgoraColors.ink : Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: active ? AgoraColors.ink : AgoraColors.hair),
+              border: Border.all(
+                  color: active ? AgoraColors.ink : AgoraColors.hair),
             ),
             child: Center(
               child: Text(
@@ -163,13 +178,18 @@ class AgendaCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.title, style: bodyStyle(fontWeight: FontWeight.w800, color: AgoraColors.ink, fontSize: 13.5)),
+                Text(item.title,
+                    style: bodyStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AgoraColors.ink,
+                        fontSize: 13.5)),
                 const SizedBox(height: 4),
                 Text(
                   item.question,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: bodyStyle(fontSize: 12.5, color: AgoraColors.inkSoft, height: 1.32),
+                  style: bodyStyle(
+                      fontSize: 12.5, color: AgoraColors.inkSoft, height: 1.32),
                 ),
               ],
             ),
@@ -232,7 +252,8 @@ class ProgressPill extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
-                gradient: const LinearGradient(colors: [AgoraColors.violet, AgoraColors.accent]),
+                gradient: const LinearGradient(
+                    colors: [AgoraColors.violet, AgoraColors.accent]),
               ),
             ),
           ),
@@ -316,7 +337,7 @@ class MemorySummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '先验证“同一问题被不同 mind 改写后，用户是否产生行动”。公共动态承接高质量总结，避免纯回音壁。',
+            'First validate whether the same question, reframed by different minds, leads the user to act. The public feed should carry high-quality summaries instead of becoming another echo chamber.',
             style: bodyStyle(fontSize: 13, height: 1.45),
           ),
           const SizedBox(height: 12),
@@ -324,9 +345,20 @@ class MemorySummaryCard extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              AgoraChip(label: '#thinking-room', backgroundColor: AgoraColors.sky, foregroundColor: Color(0xFF264FB1), borderColor: Color(0xFFCCDDF3)),
-              AgoraChip(label: '#anti-echo', backgroundColor: AgoraColors.lilac, foregroundColor: Color(0xFF5847B1), borderColor: Color(0xFFE1D8F4)),
-              AgoraChip(label: '#mvp', backgroundColor: AgoraColors.canvas, foregroundColor: AgoraColors.inkSoft),
+              AgoraChip(
+                  label: '#thinking-room',
+                  backgroundColor: AgoraColors.sky,
+                  foregroundColor: Color(0xFF264FB1),
+                  borderColor: Color(0xFFCCDDF3)),
+              AgoraChip(
+                  label: '#anti-echo',
+                  backgroundColor: AgoraColors.lilac,
+                  foregroundColor: Color(0xFF5847B1),
+                  borderColor: Color(0xFFE1D8F4)),
+              AgoraChip(
+                  label: '#mvp',
+                  backgroundColor: AgoraColors.canvas,
+                  foregroundColor: AgoraColors.inkSoft),
             ],
           ),
         ],

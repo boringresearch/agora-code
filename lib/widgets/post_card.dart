@@ -12,11 +12,13 @@ class PostCard extends StatefulWidget {
     required this.post,
     this.onAskThinker,
     this.onReply,
+    this.onDelete,
   });
 
   final FeedPost post;
   final VoidCallback? onAskThinker;
   final ValueChanged<String>? onReply;
+  final VoidCallback? onDelete;
 
   @override
   State<PostCard> createState() => _PostCardState();
@@ -98,10 +100,34 @@ class _PostCardState extends State<PostCard> {
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () {},
+              PopupMenuButton<String>(
+                tooltip: 'Post options',
                 icon: const Icon(Icons.more_horiz_rounded),
-                color: AgoraColors.mute,
+                color: Colors.white,
+                onSelected: (value) {
+                  if (value == 'delete') widget.onDelete?.call();
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'delete',
+                    enabled: widget.onDelete != null,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline_rounded,
+                            size: 18, color: AgoraColors.pink),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Delete post',
+                          style: bodyStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AgoraColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -135,32 +135,38 @@ class FakeChatClient implements ChatClient {
         {
           'speaker': 'Room',
           'role': 'Host',
-          'text': '我先把问题收束成三个维度：教育价值、社交循环、反信息茧房机制。每个人只抓一个核心矛盾。'
+          'text':
+              'I will frame the room around three dimensions: educational value, the social loop, and the anti-echo-chamber mechanism. Each mind should focus on one core tension.'
         },
         {
-          'speaker': '莫奈',
+          'speaker': 'Monet',
           'role': 'Advocate',
-          'text': '不要先做万能聊天室。先做一个让用户看到不同光线的 feed：同一个问题，被不同 mind 重新着色。'
+          'text':
+              'Do not start with a universal chatbot. Start with a feed that lets users see different light: the same question recolored by different minds.'
         },
         {
-          'speaker': '卡尔罗杰斯(Carl Rogers)',
+          'speaker': 'Carl Rogers',
           'role': 'Advocate',
-          'text': '我会问：用户离开房间后，是更依赖 AI，还是更能听到自己的声音？这是教育产品的底线。'
+          'text':
+              'My test is simple: after leaving the room, is the user more dependent on AI, or more able to hear their own voice? That is the baseline for an educational product.'
         },
         {
-          'speaker': '荣格(Jung)',
+          'speaker': 'Jung',
           'role': 'Advocate',
-          'text': '反茧房不只是多样内容，而是安全地面对阴影：用户最不想承认的问题，常常带着最大的成长能量。'
+          'text':
+              'Escaping an echo chamber is not only about diverse content. It is about safely meeting the shadow: the question a user least wants to admit often carries the most growth energy.'
         },
         {
           'speaker': 'You',
           'role': 'Builder',
-          'text': '所以 MVP 应该是一个思想房间加公共动态，而不是单纯聊天工具。'
+          'text':
+              'So the MVP should be a thinking room connected to a public feed, not just another chat tool.'
         },
         {
           'speaker': 'Room',
           'role': 'Host',
-          'text': '总结：先验证“一个问题被三种高质量视角改写后，用户是否产生行动”。这比泛社交增长更能讲清 funding 故事。'
+          'text':
+              'Summary: first validate whether one question, reframed by three high-quality perspectives, leads the user to act. That tells a stronger funding story than generic social growth.'
         }
       ]);
     }
@@ -169,13 +175,13 @@ class FakeChatClient implements ChatClient {
     final speaker = _extract(system, 'SPEAKER:', '\n') ?? 'Room';
     final role = _extract(system, 'ROLE:', '\n') ?? 'Host';
     final snippets = <String>[
-      '我会先把这个问题切得更窄：用户到底在一次会话后获得了什么新的行动能力？没有这个指标，社交外壳只是奶油色的迷宫。',
-      '这里有一个产品锚点：让每次讨论产出一张“视角地图”，再允许用户把其中一条发布到公共动态，形成学习与社交的闭环。',
-      '如果要拿 funding，主题不必追热点。更好的叙事是：AI 让教育从内容分发变成认知协作，并且有可验证的留存和行动转化。',
-      '我不同意只靠推荐多样性。需要一个 host 角色调度冲突、暂停跑偏、总结假设，否则多视角会变成漂亮的噪音。',
+      'I would narrow the problem first: what new action capability does the user gain after one session? Without that metric, the social shell is only a cream-colored maze.',
+      'Here is a product anchor: every discussion should produce a perspective map, then let the user publish one insight back into the public feed so learning and social discovery reinforce each other.',
+      'If you want funding, the theme does not need to chase trends. The stronger story is that AI moves education from content distribution to cognitive collaboration, with measurable retention and action conversion.',
+      'I do not think recommendation diversity is enough. You need a host role that schedules disagreement, pauses drift, and summarizes hypotheses, otherwise many viewpoints become elegant noise.',
     ];
     final index = DateTime.now().millisecondsSinceEpoch % snippets.length;
-    return '$speaker（$role）：${snippets[index]}';
+    return '$speaker ($role): ${snippets[index]}';
   }
 
   String? _extract(String text, String start, String end) {

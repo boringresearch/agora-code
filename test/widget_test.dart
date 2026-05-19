@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mind_agora_flutter/data/sample_data.dart';
 import 'package:mind_agora_flutter/llm/llm_client.dart';
 import 'package:mind_agora_flutter/main.dart';
 import 'package:mind_agora_flutter/models/models.dart';
@@ -48,6 +49,27 @@ void main() {
 
     expect(find.text('This comment can be posted now'), findsOneWidget);
     expect(find.text('1 replies'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Post options').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete post'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Post button test reflection'), findsNothing);
+    expect(find.text('This comment can be posted now'), findsNothing);
+    expect(find.text('Post deleted.'), findsOneWidget);
+  });
+
+  test('seeded Think Room example dialogue is in English', () {
+    final messages = seedRoomMessages(demoRoomFallback);
+    expect(messages, isNotEmpty);
+    for (final message in messages) {
+      expect(
+        RegExp(r'[\u4e00-\u9fff]').hasMatch(message.text),
+        isFalse,
+        reason: 'Message should be English: ${message.text}',
+      );
+    }
   });
 }
 

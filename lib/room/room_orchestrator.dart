@@ -19,7 +19,8 @@ class RoomOrchestrator {
   }) async {
     final mind = _chooseSpeaker(session, transcript);
     final agenda = _agendaAt(session, agendaIndex);
-    final system = _complexSystemPrompt(session: session, agenda: agenda, mind: mind);
+    final system =
+        _complexSystemPrompt(session: session, agenda: agenda, mind: mind);
     final user = _complexUserPrompt(transcript: transcript, agenda: agenda);
     final raw = await client.complete([
       LlmChatMessage(role: 'system', content: system),
@@ -42,7 +43,8 @@ class RoomOrchestrator {
     required RoomSession session,
     required List<AgoraMessage> transcript,
   }) async {
-    final prompt = buildSinglePromptDialogue(session: session, transcript: transcript);
+    final prompt =
+        buildSinglePromptDialogue(session: session, transcript: transcript);
     final raw = await client.complete([
       const LlmChatMessage(
         role: 'system',
@@ -57,8 +59,10 @@ class RoomOrchestrator {
     return _fallbackDialogue(session);
   }
 
-  MindProfile _chooseSpeaker(RoomSession session, List<AgoraMessage> transcript) {
-    final participants = session.participants.isEmpty ? <MindProfile>[] : session.participants;
+  MindProfile _chooseSpeaker(
+      RoomSession session, List<AgoraMessage> transcript) {
+    final participants =
+        session.participants.isEmpty ? <MindProfile>[] : session.participants;
     if (participants.isEmpty) {
       return const MindProfile(
         id: 'room_host',
@@ -124,7 +128,8 @@ Rules:
     required List<AgoraMessage> transcript,
     required AgendaItem agenda,
   }) {
-    final recent = transcript.reversed.take(10).toList().reversed.map((message) {
+    final recent =
+        transcript.reversed.take(10).toList().reversed.map((message) {
       return '${message.speakerName} (${message.role}): ${message.text}';
     }).join('\n');
     return '''
@@ -146,7 +151,8 @@ Continue the discussion with one valuable turn.
     ];
     for (final pattern in patterns) {
       if (value.startsWith(pattern)) {
-        final cut = value.indexOf(pattern.contains('（') || pattern.contains('(') ? '：' : pattern);
+        final cut = value.indexOf(
+            pattern.contains('（') || pattern.contains('(') ? '：' : pattern);
         if (cut >= 0 && cut + pattern.length < value.length) {
           value = value.substring(cut + pattern.length).trim();
         }
@@ -162,40 +168,50 @@ Continue the discussion with one valuable turn.
       if (start < 0 || end <= start) return [];
       final list = jsonDecode(raw.substring(start, end + 1));
       if (list is! List) return [];
-      return list.whereType<Map<String, dynamic>>().map((item) {
-        final speaker = (item['speaker'] ?? 'Room').toString();
-        final role = (item['role'] ?? _roleForSpeaker(session, speaker)).toString();
-        final isUser = speaker.toLowerCase() == 'you' || speaker == '用户';
-        final isHost = speaker.toLowerCase() == 'room' || role.toLowerCase() == 'host';
-        return AgoraMessage(
-          id: _uuid.v4(),
-          speakerId: _idForSpeaker(session, speaker),
-          speakerName: speaker,
-          role: role,
-          text: (item['text'] ?? '').toString(),
-          kind: isUser
-              ? MessageKind.user
-              : isHost
-                  ? MessageKind.host
-                  : MessageKind.thinker,
-          createdAt: DateTime.now(),
-        );
-      }).where((message) => message.text.trim().isNotEmpty).toList();
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map((item) {
+            final speaker = (item['speaker'] ?? 'Room').toString();
+            final role =
+                (item['role'] ?? _roleForSpeaker(session, speaker)).toString();
+            final isUser = speaker.toLowerCase() == 'you';
+            final isHost =
+                speaker.toLowerCase() == 'room' || role.toLowerCase() == 'host';
+            return AgoraMessage(
+              id: _uuid.v4(),
+              speakerId: _idForSpeaker(session, speaker),
+              speakerName: speaker,
+              role: role,
+              text: (item['text'] ?? '').toString(),
+              kind: isUser
+                  ? MessageKind.user
+                  : isHost
+                      ? MessageKind.host
+                      : MessageKind.thinker,
+              createdAt: DateTime.now(),
+            );
+          })
+          .where((message) => message.text.trim().isNotEmpty)
+          .toList();
     } catch (_) {
       return [];
     }
   }
 
   String _roleForSpeaker(RoomSession session, String speaker) {
-    final match = session.participants.where((mind) => mind.name == speaker).firstOrNull;
+    final match =
+        session.participants.where((mind) => mind.name == speaker).firstOrNull;
     return match?.role ?? 'Thinker';
   }
 
   String _idForSpeaker(RoomSession session, String speaker) {
-    final match = session.participants.where((mind) => mind.name == speaker).firstOrNull;
+    final match =
+        session.participants.where((mind) => mind.name == speaker).firstOrNull;
     if (match != null) return match.id;
     if (speaker.toLowerCase() == 'you') return 'you';
-    return speaker.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\u4e00-\u9fa5]+'), '_');
+    return speaker
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\u4e00-\u9fa5]+'), '_');
   }
 
   List<AgoraMessage> _fallbackDialogue(RoomSession session) {
@@ -206,16 +222,24 @@ Continue the discussion with one valuable turn.
         speakerId: 'room',
         speakerName: 'Room',
         role: 'Host',
-        text: '我们先把问题变成实验：AI 社交必须证明它让用户多一个视角，而不是多一次停留。',
+        text:
+            'Let us turn the question into an experiment: AI social media must prove that it gives users one more perspective, not just one more session.',
         kind: MessageKind.host,
         createdAt: now,
       ),
       AgoraMessage(
         id: _uuid.v4(),
-        speakerId: session.participants.isEmpty ? 'mind' : session.participants.first.id,
-        speakerName: session.participants.isEmpty ? 'Thinker' : session.participants.first.name,
-        role: session.participants.isEmpty ? 'Thinker' : session.participants.first.role,
-        text: '先做思想启发型聊天室，再让高质量总结流入社交动态。公共 feed 不要喂相似内容，要展示同题异解。',
+        speakerId: session.participants.isEmpty
+            ? 'mind'
+            : session.participants.first.id,
+        speakerName: session.participants.isEmpty
+            ? 'Thinker'
+            : session.participants.first.name,
+        role: session.participants.isEmpty
+            ? 'Thinker'
+            : session.participants.first.role,
+        text:
+            'Start with a thought-provoking room, then let high-quality summaries flow back into the social feed. The public feed should not serve similar content; it should show different interpretations of the same question.',
         kind: MessageKind.thinker,
         createdAt: now.add(const Duration(seconds: 1)),
       ),

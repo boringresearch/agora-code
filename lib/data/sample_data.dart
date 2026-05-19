@@ -173,7 +173,11 @@ final demoRoomFallback = RoomSession(
       title: 'Define regret',
       question: 'Are you afraid of having tried, or having played safe?',
       purpose: 'open',
-      requiredCoverage: ['real fear', 'decision boundary', 'what evidence matters'],
+      requiredCoverage: [
+        'real fear',
+        'decision boundary',
+        'what evidence matters'
+      ],
     ),
     AgendaItem(
       id: 'agenda_02',
@@ -210,7 +214,7 @@ List<AgoraMessage> seedRoomMessages(RoomSession session) {
       speakerName: 'Room',
       role: 'Host',
       text:
-          '主题已锁定：${session.topic}。我会先暂停公共流，整理议程，然后让不同的 mind 轮流发言。',
+          'Topic locked: ${session.topic}. I will pause the public feed, draft the agenda, and invite each mind to respond in turn.',
       kind: MessageKind.host,
       createdAt: now.subtract(const Duration(minutes: 5)),
     ),
@@ -220,7 +224,7 @@ List<AgoraMessage> seedRoomMessages(RoomSession session) {
       speakerName: nameAt(0),
       role: roleAt(0),
       text:
-          '我先看见的是一个光线问题：你不是在问功能清单，而是在问怎样让用户被外部世界重新照亮。不要把推荐系统做成画室里的假光。',
+          'I see this first as a question of light: you are not asking for a feature list, but for a way to let users be illuminated by viewpoints outside themselves. Do not turn the recommendation system into artificial studio light.',
       kind: MessageKind.thinker,
       createdAt: now.subtract(const Duration(minutes: 4)),
     ),
@@ -230,7 +234,7 @@ List<AgoraMessage> seedRoomMessages(RoomSession session) {
       speakerName: nameAt(1),
       role: roleAt(1),
       text:
-          '我听到你真正担心的是：一个教育型 AI 社交产品会不会用成长之名制造依赖。先定义关系质量，再定义算法指标。',
+          'What I hear underneath the product question is this: will an educational AI social product create dependency in the name of growth? Define the quality of the relationship before defining the algorithmic metric.',
       kind: MessageKind.thinker,
       createdAt: now.subtract(const Duration(minutes: 3)),
     ),
@@ -240,7 +244,7 @@ List<AgoraMessage> seedRoomMessages(RoomSession session) {
       speakerName: 'You',
       role: 'Builder',
       text:
-          '我想让它像社交媒体一样自然，但最终让用户多一个思考角度，而不是更沉迷。',
+          'I want it to feel as natural as social media, but the outcome should be one more thinking angle for the user, not one more addictive loop.',
       kind: MessageKind.user,
       createdAt: now.subtract(const Duration(minutes: 2)),
     ),
