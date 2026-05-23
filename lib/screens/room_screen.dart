@@ -62,7 +62,18 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
   Future<void> _load() async {
     final session =
         widget.initialSession ?? await RoomDataLoader.loadBundledRoom();
-    final messages = seedRoomMessages(session);
+    final messages = [
+      AgoraMessage(
+        id: 'seed_host',
+        speakerId: 'room_host',
+        speakerName: 'Room',
+        role: 'Host',
+        text:
+            'Topic locked: ${session.topic}. I will pause the public feed, draft the agenda, and invite each mind to respond in turn.',
+        kind: MessageKind.host,
+        createdAt: DateTime.now(),
+      ),
+    ];
     if (!mounted) return;
     setState(() {
       _session = session;
