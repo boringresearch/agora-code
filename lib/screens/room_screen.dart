@@ -624,11 +624,9 @@ class _ComposerBar extends StatelessWidget {
               ),
             ],
           ),
-          if (session.agenda.isNotEmpty) ...[  
-            const SizedBox(height: 10),
-            _AgendaProgressBar(
-                session: session, agendaIndex: agendaIndex),
-          ],
+          const SizedBox(height: 10),
+          _AgendaProgressBar(
+              session: session, agendaIndex: agendaIndex),
         ],
       ),
     );
@@ -648,86 +646,190 @@ class _AgendaProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = session.agenda;
     final count = items.length;
-    if (count == 0) return const SizedBox.shrink();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        for (int i = 0; i < count; i++) ...[
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 3,
+
+    if (count == 0) {
+      return _AgendaShimmer();
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      switchInCurve: Curves.easeOut,
+      child: Row(
+        key: ValueKey(count),
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          for (int i = 0; i < count; i++) ...[  
+            Expanded(
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  color: i <= agendaIndex
+                      ? AgoraColors.ink
+                      : AgoraColors.hair,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Tooltip(
+              message: '${items[i].title}\n${items[i].question}',
+              preferBelow: false,
+              decoration: BoxDecoration(
+                color: AgoraColors.ink,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: bodyStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  height: 1.4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: 22,
+                    height: 22,
                     decoration: BoxDecoration(
                       color: i <= agendaIndex
                           ? AgoraColors.ink
-                          : AgoraColors.hair,
-                      borderRadius: BorderRadius.circular(999),
+                          : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: i <= agendaIndex
+                            ? AgoraColors.ink
+                            : AgoraColors.hair,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${i + 1}',
+                        style: bodyStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: i <= agendaIndex
+                              ? Colors.white
+                              : AgoraColors.inkSoft,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 72,
+                    child: Text(
+                      items[i].title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: bodyStyle(
+                        fontSize: 10,
+                        fontWeight: i == agendaIndex
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                        color: i == agendaIndex
+                            ? AgoraColors.ink
+                            : AgoraColors.inkSoft,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: i <= agendaIndex ? AgoraColors.ink : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color:
-                        i <= agendaIndex ? AgoraColors.ink : AgoraColors.hair,
-                    width: 1.5,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    '${i + 1}',
-                    style: bodyStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color:
-                          i <= agendaIndex ? Colors.white : AgoraColors.inkSoft,
-                    ),
-                  ),
-                ),
+          ],
+          Expanded(
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: AgoraColors.hair,
+                borderRadius: BorderRadius.circular(999),
               ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: 72,
-                child: Text(
-                  items[i].title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: bodyStyle(
-                    fontSize: 10,
-                    fontWeight:
-                        i == agendaIndex ? FontWeight.w800 : FontWeight.w500,
-                    color: i == agendaIndex
-                        ? AgoraColors.ink
-                        : AgoraColors.inkSoft,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
-        Expanded(
-          child: Container(
-            height: 3,
-            decoration: BoxDecoration(
-              color: AgoraColors.hair,
-              borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+}
+
+class _AgendaShimmer extends StatefulWidget {
+  @override
+  State<_AgendaShimmer> createState() => _AgendaShimmerState();
+}
+
+class _AgendaShimmerState extends State<_AgendaShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, _) {
+        final opacity = 0.18 + 0.18 * _anim.value;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (int i = 0; i < 4; i++) ...[  
+              Expanded(
+                child: Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: AgoraColors.hair.withValues(alpha: opacity * 2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AgoraColors.hair.withValues(alpha: opacity),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 48,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AgoraColors.hair.withValues(alpha: opacity),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            Expanded(
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AgoraColors.hair.withValues(alpha: opacity * 2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

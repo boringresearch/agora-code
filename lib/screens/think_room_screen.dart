@@ -25,8 +25,6 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   RoomSession? _session;
   final _topicController = TextEditingController();
   final _backgroundController = TextEditingController();
-  final List<TextEditingController> _agendaTitleControllers = [];
-  final List<TextEditingController> _agendaQuestionControllers = [];
   Set<String> _selectedMindIds = {};
   List<MindProfile> _allThinkers = const [];
   bool _thinkersLoading = true;
@@ -43,7 +41,6 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   void dispose() {
     _topicController.dispose();
     _backgroundController.dispose();
-    _disposeAgendaControllers();
     super.dispose();
   }
 
@@ -73,29 +70,12 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   }
 
   void _setDraft(RoomSession session) {
-    _disposeAgendaControllers();
     _topicController.text = session.topic;
     _backgroundController.text = session.background;
-    for (final item in session.agenda) {
-      _agendaTitleControllers.add(TextEditingController(text: item.title));
-      _agendaQuestionControllers
-          .add(TextEditingController(text: item.question));
-    }
     setState(() {
       _session = session;
       _selectedMindIds = {};
     });
-  }
-
-  void _disposeAgendaControllers() {
-    for (final controller in _agendaTitleControllers) {
-      controller.dispose();
-    }
-    for (final controller in _agendaQuestionControllers) {
-      controller.dispose();
-    }
-    _agendaTitleControllers.clear();
-    _agendaQuestionControllers.clear();
   }
 
   void _toggleMind(MindProfile mind) {
@@ -124,16 +104,6 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
 
   RoomSession _draftSession() {
     final base = _session ?? demoRoomFallback;
-    final agenda = <AgendaItem>[];
-    for (var i = 0; i < base.agenda.length; i++) {
-      final title = _agendaTitleControllers[i].text.trim();
-      final question = _agendaQuestionControllers[i].text.trim();
-      if (title.isEmpty && question.isEmpty) continue;
-      agenda.add(base.agenda[i].copyWith(
-        title: title.isEmpty ? base.agenda[i].title : title,
-        question: question.isEmpty ? base.agenda[i].question : question,
-      ));
-    }
     return base.copyWith(
       id: 'room_draft_${DateTime.now().microsecondsSinceEpoch}',
       topic: _topicController.text.trim().isEmpty
@@ -143,7 +113,7 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
           ? base.background
           : _backgroundController.text.trim(),
       runtimeMode: _mode.label,
-      agenda: agenda.isEmpty ? base.agenda : agenda,
+      agenda: const [],
       participants: _resolveParticipants(),
       updatedAt: DateTime.now(),
     );
@@ -193,17 +163,10 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
                                   setState(() => _mode = mode)),
                           const SizedBox(height: 18),
                           _PlannerCard(
-                            session: session,
                             mode: _mode,
                             topicController: _topicController,
                             backgroundController: _backgroundController,
                             onBegin: _begin,
-                          ),
-                          const SizedBox(height: 18),
-                          _AgendaPreview(
-                            session: session,
-                            titleControllers: _agendaTitleControllers,
-                            questionControllers: _agendaQuestionControllers,
                           ),
                           if (!showRightRail) ...[
                             const SizedBox(height: 18),
@@ -267,14 +230,12 @@ class _Header extends StatelessWidget {
 
 class _PlannerCard extends StatelessWidget {
   const _PlannerCard({
-    required this.session,
     required this.mode,
     required this.topicController,
     required this.backgroundController,
     required this.onBegin,
   });
 
-  final RoomSession session;
   final RoomMode mode;
   final TextEditingController topicController;
   final TextEditingController backgroundController;
@@ -337,58 +298,21 @@ class _PlannerCard extends StatelessWidget {
             maxLines: 4,
           ),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              AgoraChip(
-                label: mode.label,
-                icon: mode == RoomMode.complex
-                    ? Icons.account_tree_outlined
-                    : Icons.short_text_rounded,
-                backgroundColor: mode == RoomMode.complex
-                    ? AgoraColors.sky
-                    : AgoraColors.lilac,
-                foregroundColor: mode == RoomMode.complex
-                    ? const Color(0xFF264FB1)
-                    : AgoraColors.violet,
-                borderColor: mode == RoomMode.complex
-                    ? const Color(0xFFCCDDF3)
-                    : const Color(0xFFE1D8F4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: onBegin,
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Begin dialogue'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AgoraColors.ink,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999)),
               ),
-              AgoraChip(label: session.outcomeType, icon: Icons.map_outlined),
-              AgoraChip(
-                  label: '${session.agenda.length} editable agenda items',
-                  icon: Icons.checklist_rtl_rounded),
-            ],
-          ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  mode == RoomMode.complex
-                      ? 'Complex mode: host selects the next mind, tracks agenda, and calls the model each turn.'
-                      : 'Prompt mode: one structured prompt generates a complete multi-person dialogue, then the same chat UI renders it.',
-                  style: bodyStyle(
-                      fontSize: 13.5, color: AgoraColors.inkSoft, height: 1.4),
-                ),
-              ),
-              const SizedBox(width: 16),
-              FilledButton.icon(
-                onPressed: onBegin,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('Begin dialogue'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AgoraColors.ink,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999)),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -446,144 +370,6 @@ class _EditableFieldBlock extends StatelessWidget {
                   ),
                   style: bodyStyle(
                       fontSize: 14.5, height: 1.45, color: AgoraColors.ink2),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AgendaPreview extends StatelessWidget {
-  const _AgendaPreview({
-    required this.session,
-    required this.titleControllers,
-    required this.questionControllers,
-  });
-
-  final RoomSession session;
-  final List<TextEditingController> titleControllers;
-  final List<TextEditingController> questionControllers;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('Agenda drafted by Room',
-                  style:
-                      displayStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-              const Spacer(),
-              const AgoraChip(label: 'editable', icon: Icons.edit_outlined),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...session.agenda.take(4).toList().asMap().entries.map(
-                (entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _EditableAgendaCard(
-                    index: entry.key,
-                    active: entry.key == 0,
-                    titleController: titleControllers[entry.key],
-                    questionController: questionControllers[entry.key],
-                  ),
-                ),
-              ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EditableAgendaCard extends StatelessWidget {
-  const _EditableAgendaCard({
-    required this.index,
-    required this.active,
-    required this.titleController,
-    required this.questionController,
-  });
-
-  final int index;
-  final bool active;
-  final TextEditingController titleController;
-  final TextEditingController questionController;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: active ? Colors.white : Colors.white.withValues(alpha: 0.66),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: active
-                ? AgoraColors.accent.withValues(alpha: 0.52)
-                : AgoraColors.hair),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: active ? AgoraColors.ink : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                  color: active ? AgoraColors.ink : AgoraColors.hair),
-            ),
-            child: Center(
-              child: Text(
-                '${index + 1}',
-                style: bodyStyle(
-                    fontSize: 12,
-                    color: active ? Colors.white : AgoraColors.inkSoft,
-                    fontWeight: FontWeight.w800),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: titleController,
-                  maxLines: 1,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: bodyStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AgoraColors.ink,
-                      fontSize: 13.5),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: questionController,
-                  minLines: 1,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: bodyStyle(
-                      fontSize: 12.5, color: AgoraColors.inkSoft, height: 1.32),
                 ),
               ],
             ),
