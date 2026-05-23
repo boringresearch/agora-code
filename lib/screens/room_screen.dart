@@ -42,6 +42,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
   List<AgoraMessage> _messages = const [];
   int _agendaIndex = 0;
   bool _running = false;
+  bool _agendaReady = false;
   String? _error;
 
   @override
@@ -62,33 +63,56 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
   Future<void> _load() async {
     final session =
         widget.initialSession ?? await RoomDataLoader.loadBundledRoom();
-    final messages = [
-      AgoraMessage(
-        id: 'seed_host',
-        speakerId: 'room_host',
-        speakerName: 'Room',
-        role: 'Host',
-        text:
-            'Topic locked: ${session.topic}. I will pause the public feed, draft the agenda, and invite each mind to respond in turn.',
-        kind: MessageKind.host,
-        createdAt: DateTime.now(),
-      ),
-    ];
+    final hostMsg = AgoraMessage(
+      id: 'seed_host',
+      speakerId: 'room_host',
+      speakerName: 'Room',
+      role: 'Host',
+      text:
+          'Topic locked: ${session.topic}. Drafting the agenda — each mind will be invited to respond in turn.',
+      kind: MessageKind.host,
+      createdAt: DateTime.now(),
+    );
     if (!mounted) return;
     setState(() {
       _session = session;
-      _messages = messages;
+      _messages = [hostMsg];
     });
     await widget.store.saveSession(session);
-    for (final message in messages) {
-      await widget.store.saveMessage(session.id, message);
-    }
+    await widget.store.saveMessage(session.id, hostMsg);
     _jumpToBottom();
+    _generateAgenda(session);
+  }
+
+  Future<void> _generateAgenda(RoomSession session) async {
+    try {
+      final items = await _orchestrator.generateAgenda(session);
+      if (!mounted) return;
+      final updated = session.copyWith(agenda: items);
+      setState(() {
+        _session = updated;
+        _agendaReady = true;
+      });
+      await widget.store.saveSession(updated);
+      final agendaMsg = AgoraMessage(
+        id: 'seed_agenda',
+        speakerId: 'room_host',
+        speakerName: 'Room',
+        role: 'Host',
+        text: 'Agenda ready. ${items.length} topics drafted. Press Next to begin.',
+        kind: MessageKind.host,
+        createdAt: DateTime.now(),
+      );
+      await _append(agendaMsg);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _agendaReady = true);
+    }
   }
 
   Future<void> _runModel() async {
     final session = _session;
-    if (session == null || _running) return;
+    if (session == null || _running || !_agendaReady) return;
     setState(() {
       _running = true;
       _error = null;
@@ -184,6 +208,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                         agendaIndex: _agendaIndex,
                         mode: _mode,
                         running: _running,
+                        agendaReady: _agendaReady,
                         error: _error,
                         scrollController: _scrollController,
                         controller: _controller,
@@ -232,6 +257,7 @@ class _RoomChatCard extends StatelessWidget {
     required this.agendaIndex,
     required this.mode,
     required this.running,
+    required this.agendaReady,
     required this.error,
     required this.scrollController,
     required this.controller,
@@ -247,6 +273,7 @@ class _RoomChatCard extends StatelessWidget {
   final int agendaIndex;
   final RoomMode mode;
   final bool running;
+  final bool agendaReady;
   final String? error;
   final ScrollController scrollController;
   final TextEditingController controller;
@@ -306,6 +333,7 @@ class _RoomChatCard extends StatelessWidget {
             agendaIndex: agendaIndex,
             controller: controller,
             running: running,
+            agendaReady: agendaReady,
             mode: mode,
             error: null,
             onSend: onSend,
@@ -541,6 +569,7 @@ class _ComposerBar extends StatelessWidget {
     required this.agendaIndex,
     required this.controller,
     required this.running,
+    required this.agendaReady,
     required this.mode,
     required this.error,
     required this.onSend,
@@ -551,6 +580,7 @@ class _ComposerBar extends StatelessWidget {
   final int agendaIndex;
   final TextEditingController controller;
   final bool running;
+  final bool agendaReady;
   final RoomMode mode;
   final String? error;
   final VoidCallback onSend;
@@ -602,8 +632,8 @@ class _ComposerBar extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               FilledButton.icon(
-                onPressed: running ? null : onRun,
-                icon: running
+                onPressed: (running || !agendaReady) ? null : onRun,
+                icon: (running || !agendaReady)
                     ? const SizedBox(
                         width: 14,
                         height: 14,
@@ -611,7 +641,11 @@ class _ComposerBar extends StatelessWidget {
                     : Icon(mode == RoomMode.complex
                         ? Icons.skip_next_rounded
                         : Icons.auto_awesome_rounded),
-                label: Text(mode == RoomMode.complex ? 'Next' : 'Simulate'),
+                label: Text(!agendaReady
+                    ? 'Drafting...'
+                    : mode == RoomMode.complex
+                        ? 'Next'
+                        : 'Simulate'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AgoraColors.accent,
                   foregroundColor: Colors.white,

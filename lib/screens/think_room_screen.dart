@@ -70,8 +70,6 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   }
 
   void _setDraft(RoomSession session) {
-    _topicController.text = session.topic;
-    _backgroundController.text = session.background;
     setState(() {
       _session = session;
       _selectedMindIds = {};
@@ -106,12 +104,8 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
     final base = _session ?? demoRoomFallback;
     return base.copyWith(
       id: 'room_draft_${DateTime.now().microsecondsSinceEpoch}',
-      topic: _topicController.text.trim().isEmpty
-          ? base.topic
-          : _topicController.text.trim(),
-      background: _backgroundController.text.trim().isEmpty
-          ? base.background
-          : _backgroundController.text.trim(),
+      topic: _topicController.text.trim(),
+      background: _backgroundController.text.trim(),
       runtimeMode: _mode.label,
       agenda: const [],
       participants: _resolveParticipants(),
@@ -120,6 +114,15 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   }
 
   void _begin() {
+    if (_topicController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a topic to begin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (_selectedMindIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -285,14 +288,17 @@ class _PlannerCard extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           _EditableFieldBlock(
-            label: 'Question',
+            label: 'Topic',
+            hint: 'What question should the council explore?',
             icon: Icons.question_answer_outlined,
             controller: topicController,
             maxLines: 3,
+            required: true,
           ),
           const SizedBox(height: 14),
           _EditableFieldBlock(
             label: 'Context',
+            hint: 'Background, goals, or constraints (optional)',
             icon: Icons.backpack_outlined,
             controller: backgroundController,
             maxLines: 4,
@@ -321,16 +327,21 @@ class _PlannerCard extends StatelessWidget {
 }
 
 class _EditableFieldBlock extends StatelessWidget {
-  const _EditableFieldBlock(
-      {required this.label,
-      required this.icon,
-      required this.controller,
-      required this.maxLines});
+  const _EditableFieldBlock({
+    required this.label,
+    required this.icon,
+    required this.controller,
+    required this.maxLines,
+    this.hint,
+    this.required = false,
+  });
 
   final String label;
+  final String? hint;
   final IconData icon;
   final TextEditingController controller;
   final int maxLines;
+  final bool required;
 
   @override
   Widget build(BuildContext context) {
@@ -350,17 +361,32 @@ class _EditableFieldBlock extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label.toUpperCase(),
-                    style: bodyStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AgoraColors.mute)),
+                Row(
+                  children: [
+                    Text(label.toUpperCase(),
+                        style: bodyStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AgoraColors.mute)),
+                    if (required)
+                      Text(' *',
+                          style: bodyStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AgoraColors.accent)),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: controller,
                   minLines: 1,
                   maxLines: maxLines,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    hintStyle: bodyStyle(
+                        fontSize: 14.5,
+                        height: 1.45,
+                        color: AgoraColors.mute),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,

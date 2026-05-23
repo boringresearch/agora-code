@@ -12,6 +12,53 @@ class RoomOrchestrator {
   final ChatClient client;
   final _uuid = const Uuid();
 
+  Future<List<AgendaItem>> generateAgenda(RoomSession session) async {
+    final minds = session.participants
+        .map((m) => '${m.name} (${m.role})')
+        .join(', ');
+    final prompt = '''
+You are the host of a structured thinking room.
+Topic: ${session.topic}
+${session.background.isEmpty ? '' : 'Context: ${session.background}\n'}Participants: $minds
+
+Generate a focused 4-step agenda as a JSON array. Each item must have:
+- "title": short phrase (max 6 words)
+- "question": one focused question for that step
+- "purpose": one sentence on what this step achieves
+
+Return ONLY the JSON array, no markdown, no explanation.
+Example format:
+[
+  {"title": "Define the real problem", "question": "What is the underlying issue?", "purpose": "Align the room on what we are actually solving."},
+  ...
+]
+''';
+
+    try {
+      final raw = await client.complete([
+        const LlmChatMessage(
+            role: 'system',
+            content: 'You generate structured agenda JSON for thinking rooms.'),
+        LlmChatMessage(role: 'user', content: prompt),
+      ], maxTokens: 800);
+      final start = raw.indexOf('[');
+      final end = raw.lastIndexOf(']');
+      if (start < 0 || end <= start) return [];
+      final list =
+          jsonDecode(raw.substring(start, end + 1)) as List<dynamic>;
+      return list.whereType<Map<String, dynamic>>().map((item) {
+        return AgendaItem(
+          id: 'agenda_${item['title'].toString().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_')}',
+          title: (item['title'] ?? '').toString(),
+          question: (item['question'] ?? '').toString(),
+          purpose: (item['purpose'] ?? '').toString(),
+        );
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<AgoraMessage> runNextComplexTurn({
     required RoomSession session,
     required List<AgoraMessage> transcript,
