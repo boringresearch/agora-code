@@ -320,7 +320,10 @@ class _RightRail extends StatelessWidget {
               ...railThinkers.map(
                 (thinker) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: ThinkerRailTile(thinker: thinker),
+                  child: ThinkerRailTile(
+                    thinker: thinker,
+                    onTap: onOpenRoom,
+                  ),
                 ),
               ),
               const Divider(height: 1, color: AgoraColors.hair),

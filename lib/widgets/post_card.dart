@@ -549,14 +549,20 @@ class PromptTile extends StatelessWidget {
 }
 
 class ThinkerRailTile extends StatelessWidget {
-  const ThinkerRailTile({super.key, required this.thinker, this.trailing});
+  const ThinkerRailTile({
+    super.key,
+    required this.thinker,
+    this.trailing,
+    this.onTap,
+  });
 
   final MindProfile thinker;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final content = Row(
       children: [
         ThinkerAvatar(name: thinker.name, size: 44, color: thinker.color),
         const SizedBox(width: 12),
@@ -579,9 +585,27 @@ class ThinkerRailTile extends StatelessWidget {
           ),
         ),
         trailing ??
-            const Icon(Icons.chat_bubble_outline_rounded,
-                size: 18, color: AgoraColors.inkSoft),
+            IconButton(
+              onPressed: onTap,
+              tooltip: 'Chat with ${thinker.name}',
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              color: AgoraColors.inkSoft,
+              visualDensity: VisualDensity.compact,
+            ),
       ],
+    );
+
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: content,
+        ),
+      ),
     );
   }
 }

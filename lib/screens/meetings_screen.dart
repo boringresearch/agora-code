@@ -12,11 +12,13 @@ class MeetingsScreen extends StatelessWidget {
   const MeetingsScreen({
     super.key,
     required this.store,
+    required this.onNewRoom,
     required this.onOpenRoom,
   });
 
   final LocalStore store;
-  final VoidCallback onOpenRoom;
+  final VoidCallback onNewRoom;
+  final ValueChanged<RoomSession> onOpenRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +39,7 @@ class MeetingsScreen extends StatelessWidget {
                             fontSize: 30, fontWeight: FontWeight.w800)),
                     const Spacer(),
                     FilledButton.icon(
-                      onPressed: onOpenRoom,
+                      onPressed: onNewRoom,
                       icon: const Icon(Icons.add_rounded),
                       label: const Text('New room'),
                       style: FilledButton.styleFrom(
@@ -84,7 +86,7 @@ class MeetingsScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 16),
                             FilledButton(
-                              onPressed: onOpenRoom,
+                              onPressed: onNewRoom,
                               style: FilledButton.styleFrom(
                                 backgroundColor: AgoraColors.ink,
                                 foregroundColor: Colors.white,
@@ -102,7 +104,7 @@ class MeetingsScreen extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 14),
                           child: SoftCard(
-                            onTap: onOpenRoom,
+                            onTap: () => onOpenRoom(session),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [

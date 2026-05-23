@@ -3,6 +3,16 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../storage/local_store.dart';
+
+class LlmSettingsKeys {
+  const LlmSettingsKeys._();
+
+  static const baseUrl = 'llm.base_url.v1';
+  static const apiKey = 'llm.api_key.v1';
+  static const model = 'llm.model.v1';
+}
+
 class LlmConfig {
   const LlmConfig({
     required this.baseUrl,
@@ -39,11 +49,25 @@ class LlmChatMessage {
 }
 
 abstract class ChatClient {
+  bool get usesRealApi => false;
+
   Future<String> complete(
     List<LlmChatMessage> messages, {
     double temperature = 0.72,
     int maxTokens = 900,
   });
+
+  Stream<String> streamComplete(
+    List<LlmChatMessage> messages, {
+    double temperature = 0.72,
+    int maxTokens = 900,
+  }) async* {
+    yield await complete(
+      messages,
+      temperature: temperature,
+      maxTokens: maxTokens,
+    );
+  }
 }
 
 class OpenAiCompatibleChatClient implements ChatClient {
@@ -54,26 +78,24 @@ class OpenAiCompatibleChatClient implements ChatClient {
   final http.Client _client;
 
   @override
+  bool get usesRealApi => true;
+
+  @override
   Future<String> complete(
     List<LlmChatMessage> messages, {
     double temperature = 0.72,
     int maxTokens = 900,
   }) async {
-    final uri = Uri.parse('${_trimRight(config.baseUrl)}/chat/completions');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (config.apiKey.trim().isNotEmpty)
-        'Authorization': 'Bearer ${config.apiKey}',
-    };
-    final payload = {
-      'model': config.model,
-      'messages': messages.map((message) => message.toJson()).toList(),
-      'temperature': temperature,
-      'max_tokens': maxTokens,
-    };
-
     final response = await _client
-        .post(uri, headers: headers, body: jsonEncode(payload))
+        .post(
+          _chatCompletionsUri,
+          headers: _headers,
+          body: jsonEncode(_payload(
+            messages,
+            temperature: temperature,
+            maxTokens: maxTokens,
+          )),
+        )
         .timeout(Duration(seconds: config.timeoutSeconds));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -83,6 +105,78 @@ class OpenAiCompatibleChatClient implements ChatClient {
     }
 
     final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return _extractText(decoded);
+  }
+
+  @override
+  Stream<String> streamComplete(
+    List<LlmChatMessage> messages, {
+    double temperature = 0.72,
+    int maxTokens = 900,
+  }) async* {
+    final request = http.Request('POST', _chatCompletionsUri)
+      ..headers.addAll(_headers)
+      ..body = jsonEncode({
+        ..._payload(
+          messages,
+          temperature: temperature,
+          maxTokens: maxTokens,
+        ),
+        'stream': true,
+      });
+
+    final response = await _client
+        .send(request)
+        .timeout(Duration(seconds: config.timeoutSeconds));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final body = await utf8.decodeStream(response.stream);
+      throw LlmException(
+        'LLM endpoint returned HTTP ${response.statusCode}: $body',
+      );
+    }
+
+    var emitted = false;
+    await for (final line in response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
+      final data = trimmed.substring(5).trim();
+      if (data == '[DONE]') break;
+      final chunk = _extractStreamChunk(jsonDecode(data));
+      if (chunk == null || chunk.isEmpty) continue;
+      emitted = true;
+      yield chunk;
+    }
+
+    if (!emitted) {
+      throw const LlmException('LLM stream ended without text content.');
+    }
+  }
+
+  Uri get _chatCompletionsUri =>
+      Uri.parse('${_trimRight(config.baseUrl)}/chat/completions');
+
+  Map<String, String> get _headers => <String, String>{
+        'Content-Type': 'application/json',
+        if (config.apiKey.trim().isNotEmpty)
+          'Authorization': 'Bearer ${config.apiKey}',
+      };
+
+  Map<String, dynamic> _payload(
+    List<LlmChatMessage> messages, {
+    required double temperature,
+    required int maxTokens,
+  }) {
+    return {
+      'model': config.model,
+      'messages': messages.map((message) => message.toJson()).toList(),
+      'temperature': temperature,
+      'max_tokens': maxTokens,
+    };
+  }
+
+  static String _extractText(Object? decoded) {
     if (decoded is! Map<String, dynamic>) {
       throw const LlmException('LLM endpoint returned a non-object payload.');
     }
@@ -104,6 +198,27 @@ class OpenAiCompatibleChatClient implements ChatClient {
     throw const LlmException('LLM response did not include text content.');
   }
 
+  static String? _extractStreamChunk(Object? decoded) {
+    if (decoded is! Map<String, dynamic>) return null;
+    final choices = decoded['choices'];
+    if (choices is! List || choices.isEmpty) return null;
+    final first = choices.first;
+    if (first is! Map<String, dynamic>) return null;
+    final delta = first['delta'];
+    if (delta is Map<String, dynamic>) {
+      final content = delta['content'];
+      if (content is String) return content;
+    }
+    final message = first['message'];
+    if (message is Map<String, dynamic>) {
+      final content = message['content'];
+      if (content is String) return content;
+    }
+    final text = first['text'];
+    if (text is String) return text;
+    return null;
+  }
+
   static String _trimRight(String value) {
     var result = value.trim();
     while (result.endsWith('/')) {
@@ -121,7 +236,120 @@ class LlmException implements Exception {
   String toString() => 'LlmException: $message';
 }
 
+class SettingsBackedChatClient implements ChatClient {
+  SettingsBackedChatClient(this.store, this.fallbackConfig);
+
+  final LocalStore store;
+  final LlmConfig fallbackConfig;
+
+  @override
+  bool get usesRealApi => true;
+
+  @override
+  Future<String> complete(
+    List<LlmChatMessage> messages, {
+    double temperature = 0.72,
+    int maxTokens = 900,
+  }) async {
+    return _withConfiguredClient((client) {
+      return client.complete(
+        messages,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+    });
+  }
+
+  @override
+  Stream<String> streamComplete(
+    List<LlmChatMessage> messages, {
+    double temperature = 0.72,
+    int maxTokens = 900,
+  }) async* {
+    final client = await _configuredClient();
+    yield* client.streamComplete(
+      messages,
+      temperature: temperature,
+      maxTokens: maxTokens,
+    );
+  }
+
+  Future<T> _withConfiguredClient<T>(
+    Future<T> Function(OpenAiCompatibleChatClient client) callback,
+  ) async {
+    return callback(await _configuredClient());
+  }
+
+  Future<OpenAiCompatibleChatClient> _configuredClient() async {
+    final config = await readConfig();
+    if (!config.isConfigured) {
+      throw const LlmException(
+        'Real LLM API is not configured. Open Settings from You and save a base URL, API key, and model.',
+      );
+    }
+    return OpenAiCompatibleChatClient(config);
+  }
+
+  Future<LlmConfig> readConfig() async {
+    final savedBaseUrl = await store.readSetting(LlmSettingsKeys.baseUrl);
+    final baseUrl = _browserSafeBaseUrl(_firstNonEmpty(
+      savedBaseUrl,
+      fallbackConfig.baseUrl,
+    ));
+    final apiKey = _firstNonEmpty(
+      await store.readSetting(LlmSettingsKeys.apiKey),
+      fallbackConfig.apiKey,
+    );
+    final model = _firstNonEmpty(
+      await store.readSetting(LlmSettingsKeys.model),
+      fallbackConfig.model,
+      'gpt-5.5',
+    );
+    return LlmConfig(
+      baseUrl: baseUrl,
+      apiKey: apiKey,
+      model: model,
+      timeoutSeconds: fallbackConfig.timeoutSeconds,
+    );
+  }
+
+  String _browserSafeBaseUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed == 'https://gw2.oops.asia' ||
+        trimmed == 'https://gw2.oops.asia/' ||
+        trimmed == 'https://gw2.oops.asia/v1' ||
+        trimmed == 'https://gw2.oops.asia/v1/') {
+      return '/api/llm';
+    }
+    return trimmed;
+  }
+
+  String _firstNonEmpty(String? first, String second, [String fallback = '']) {
+    final firstTrimmed = first?.trim() ?? '';
+    if (firstTrimmed.isNotEmpty) return firstTrimmed;
+    final secondTrimmed = second.trim();
+    if (secondTrimmed.isNotEmpty) return secondTrimmed;
+    return fallback;
+  }
+}
+
 class FakeChatClient implements ChatClient {
+  @override
+  bool get usesRealApi => false;
+
+  @override
+  Stream<String> streamComplete(
+    List<LlmChatMessage> messages, {
+    double temperature = 0.72,
+    int maxTokens = 900,
+  }) async* {
+    yield await complete(
+      messages,
+      temperature: temperature,
+      maxTokens: maxTokens,
+    );
+  }
+
   @override
   Future<String> complete(
     List<LlmChatMessage> messages, {

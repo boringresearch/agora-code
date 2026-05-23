@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../theme/agora_theme.dart';
 import 'avatar.dart';
 import 'chip.dart';
+import 'markdown_text.dart';
 import 'soft_card.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -109,10 +110,13 @@ class ChatBubble extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 7),
-                      Text(
-                        message.text,
-                        style: bodyStyle(
-                            fontSize: 15, height: 1.55, color: textColor),
+                      MarkdownText(
+                        text: message.text,
+                        style: bodyStyle(fontSize: 15, height: 1.55),
+                        color: textColor,
+                        codeBackground: isUser
+                            ? Colors.white.withOpacity(0.14)
+                            : AgoraColors.canvas.withOpacity(0.86),
                       ),
                     ],
                   ),

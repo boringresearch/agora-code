@@ -13,9 +13,7 @@ Future<void> main() async {
   await store.init();
 
   final config = LlmConfig.fromEnvironment();
-  final chatClient = config.isConfigured
-      ? OpenAiCompatibleChatClient(config)
-      : FakeChatClient();
+  final chatClient = SettingsBackedChatClient(store, config);
 
   runApp(MindAgoraApp(store: store, chatClient: chatClient));
 }

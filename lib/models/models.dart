@@ -15,6 +15,7 @@ enum AppSection {
   collections,
   notifications,
   messages,
+  settings,
 }
 
 extension AppSectionLabel on AppSection {
@@ -30,6 +31,7 @@ extension AppSectionLabel on AppSection {
       AppSection.collections => 'Collections',
       AppSection.notifications => 'Notifications',
       AppSection.messages => 'Messages',
+      AppSection.settings => 'Settings',
     };
   }
 
@@ -45,6 +47,7 @@ extension AppSectionLabel on AppSection {
       AppSection.collections => Icons.library_books_outlined,
       AppSection.notifications => Icons.notifications_none_rounded,
       AppSection.messages => Icons.mail_outline_rounded,
+      AppSection.settings => Icons.settings_outlined,
     };
   }
 }
@@ -227,6 +230,32 @@ class AgendaItem {
   final int estimatedTurns;
   final int maxTurns;
 
+  AgendaItem copyWith({
+    String? id,
+    String? title,
+    String? question,
+    String? purpose,
+    String? status,
+    List<String>? requiredCoverage,
+    List<String>? allowedScope,
+    int? minTurns,
+    int? estimatedTurns,
+    int? maxTurns,
+  }) {
+    return AgendaItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      question: question ?? this.question,
+      purpose: purpose ?? this.purpose,
+      status: status ?? this.status,
+      requiredCoverage: requiredCoverage ?? this.requiredCoverage,
+      allowedScope: allowedScope ?? this.allowedScope,
+      minTurns: minTurns ?? this.minTurns,
+      estimatedTurns: estimatedTurns ?? this.estimatedTurns,
+      maxTurns: maxTurns ?? this.maxTurns,
+    );
+  }
+
   factory AgendaItem.fromRoomData(Map<String, dynamic> json, int index) {
     return AgendaItem(
       id: (json['id'] ?? 'agenda_${index + 1}').toString(),
@@ -294,6 +323,30 @@ class RoomSession {
   final List<MindProfile> participants;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  RoomSession copyWith({
+    String? id,
+    String? topic,
+    String? background,
+    String? outcomeType,
+    String? runtimeMode,
+    List<AgendaItem>? agenda,
+    List<MindProfile>? participants,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return RoomSession(
+      id: id ?? this.id,
+      topic: topic ?? this.topic,
+      background: background ?? this.background,
+      outcomeType: outcomeType ?? this.outcomeType,
+      runtimeMode: runtimeMode ?? this.runtimeMode,
+      agenda: agenda ?? this.agenda,
+      participants: participants ?? this.participants,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   AgendaItem get activeAgenda => agenda.isEmpty
       ? const AgendaItem(

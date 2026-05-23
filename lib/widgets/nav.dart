@@ -10,10 +10,12 @@ class SideNav extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onSelected,
+    required this.onProfileTap,
   });
 
   final AppSection selected;
   final ValueChanged<AppSection> onSelected;
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -66,29 +68,47 @@ class SideNav extends StatelessWidget {
               const Spacer(),
               const _SidebarArch(),
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.86),
+              Material(
+                color: Colors.white.withOpacity(0.86),
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AgoraColors.hair),
-                  boxShadow: AgoraShadows.card,
-                ),
-                child: Row(
-                  children: [
-                    const ThinkerAvatar(name: 'You', size: 38, dark: true),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('You', style: bodyStyle(fontWeight: FontWeight.w800, color: AgoraColors.ink)),
-                          Text('@you', style: bodyStyle(fontSize: 11, color: AgoraColors.mute)),
-                        ],
+                  onTap: onProfileTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: selected == AppSection.settings
+                            ? AgoraColors.ink
+                            : AgoraColors.hair,
                       ),
+                      boxShadow: AgoraShadows.card,
                     ),
-                    const Icon(Icons.chevron_right_rounded, color: AgoraColors.mute),
-                  ],
+                    child: Row(
+                      children: [
+                        const ThinkerAvatar(name: 'You', size: 38, dark: true),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('You',
+                                  style: bodyStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: AgoraColors.ink)),
+                              Text('Settings',
+                                  style: bodyStyle(
+                                      fontSize: 11, color: AgoraColors.mute)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.settings_outlined,
+                            color: AgoraColors.mute, size: 18),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -127,11 +147,14 @@ class _NavTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: selected ? Border.all(color: const Color(0xFFE6DCC4)) : null,
+              border:
+                  selected ? Border.all(color: const Color(0xFFE6DCC4)) : null,
             ),
             child: Row(
               children: [
-                Icon(section.icon, size: 20, color: selected ? AgoraColors.ink : AgoraColors.inkSoft),
+                Icon(section.icon,
+                    size: 20,
+                    color: selected ? AgoraColors.ink : AgoraColors.inkSoft),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -146,7 +169,10 @@ class _NavTile extends StatelessWidget {
                 if (badge != null)
                   Text(
                     badge!,
-                    style: bodyStyle(fontSize: 11, color: AgoraColors.mute, fontWeight: FontWeight.w800),
+                    style: bodyStyle(
+                        fontSize: 11,
+                        color: AgoraColors.mute,
+                        fontWeight: FontWeight.w800),
                   ),
               ],
             ),
@@ -224,7 +250,8 @@ class _SidebarArch extends StatelessWidget {
 class _SidebarArchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final glowRect = Rect.fromCircle(center: Offset(size.width / 2, 84), radius: 78);
+    final glowRect =
+        Rect.fromCircle(center: Offset(size.width / 2, 84), radius: 78);
     canvas.drawOval(
       glowRect,
       Paint()
@@ -240,7 +267,8 @@ class _SidebarArchPainter extends CustomPainter {
     final path = Path()
       ..moveTo(size.width * 0.35, size.height - 4)
       ..lineTo(size.width * 0.35, 54)
-      ..arcToPoint(Offset(size.width * 0.65, 54), radius: Radius.circular(size.width * 0.15))
+      ..arcToPoint(Offset(size.width * 0.65, 54),
+          radius: Radius.circular(size.width * 0.15))
       ..lineTo(size.width * 0.65, size.height - 4);
     canvas.drawPath(path, stroke);
     final sparkle = Paint()..color = const Color(0xFFF2C66A);
