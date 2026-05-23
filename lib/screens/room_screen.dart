@@ -16,12 +16,14 @@ class LiveRoomScreen extends StatefulWidget {
   const LiveRoomScreen({
     super.key,
     required this.initialMode,
+    this.initialSession,
     required this.store,
     required this.chatClient,
     required this.onBackToPlanner,
   });
 
   final RoomMode initialMode;
+  final RoomSession? initialSession;
   final LocalStore store;
   final ChatClient chatClient;
   final VoidCallback onBackToPlanner;
@@ -58,7 +60,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
   }
 
   Future<void> _load() async {
-    final session = await RoomDataLoader.loadBundledRoom();
+    final session =
+        widget.initialSession ?? await RoomDataLoader.loadBundledRoom();
     final messages = seedRoomMessages(session);
     if (!mounted) return;
     setState(() {
@@ -87,9 +90,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
           agendaIndex: _agendaIndex,
         );
         await _append(next);
-        if (_messages.length > 0 && _messages.length % 5 == 0) {
+        if (_messages.isNotEmpty && _messages.length % 5 == 0) {
           setState(() {
-            final maxIndex = session.agenda.isEmpty ? 0 : session.agenda.length - 1;
+            final maxIndex =
+                session.agenda.isEmpty ? 0 : session.agenda.length - 1;
             _agendaIndex = (_agendaIndex + 1).clamp(0, maxIndex).toInt();
           });
         }
@@ -152,21 +156,12 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
       bottom: false,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final showLeftRail = constraints.maxWidth >= 900;
-          final showRightRail = constraints.maxWidth >= 1120;
+          final showRightRail = constraints.maxWidth >= 960;
           return Stack(
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (showLeftRail)
-                    SizedBox(
-                      width: 288,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(26, 22, 12, 110),
-                        child: _LeftRail(session: session, agendaIndex: _agendaIndex),
-                      ),
-                    ),
                   Expanded(
                     child: Column(
                       children: [
@@ -175,10 +170,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                           mode: _mode,
                           onModeChanged: (mode) => setState(() => _mode = mode),
                           onBack: widget.onBackToPlanner,
-                          compact: !showLeftRail,
+                          compact: !showRightRail,
                         ),
-                        if (!showLeftRail)
-                          _MobileAgendaStrip(session: session, agendaIndex: _agendaIndex),
                         Expanded(
                           child: ListView.separated(
                             controller: _scrollController,
@@ -186,16 +179,18 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                               constraints.maxWidth < 700 ? 16 : 26,
                               12,
                               constraints.maxWidth < 700 ? 16 : 26,
-                              constraints.maxWidth < 820 ? 210 : 150,
+                              constraints.maxWidth < 820 ? 230 : 170,
                             ),
                             itemBuilder: (context, index) {
                               final message = _messages[index];
                               return ChatBubble(
                                 message: message,
-                                avatarColor: _colorFor(session, message.speakerId),
+                                avatarColor:
+                                    _colorFor(session, message.speakerId),
                               );
                             },
-                            separatorBuilder: (_, __) => const SizedBox(height: 18),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 18),
                             itemCount: _messages.length,
                           ),
                         ),
@@ -207,7 +202,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                       width: 300,
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(10, 22, 20, 110),
-                        child: _RightRail(
+                        child: _DetailsPanel(
                           session: session,
                           messages: _messages,
                           mode: _mode,
@@ -219,10 +214,12 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                 ],
               ),
               Positioned(
-                left: showLeftRail ? 288 : 0,
+                left: 0,
                 right: showRightRail ? 300 : 0,
                 bottom: 0,
                 child: _ComposerBar(
+                  session: session,
+                  agendaIndex: _agendaIndex,
                   controller: _controller,
                   running: _running,
                   mode: _mode,
@@ -278,7 +275,11 @@ class _RoomTopBar extends StatelessWidget {
               children: [
                 Text(
                   'THINKING ROOM · LISBON · LIVE',
-                  style: bodyStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AgoraColors.mute).copyWith(letterSpacing: 2.2),
+                  style: bodyStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AgoraColors.mute)
+                      .copyWith(letterSpacing: 2.2),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -286,7 +287,8 @@ class _RoomTopBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: displayStyle(fontSize: compact ? 15 : 17, fontWeight: FontWeight.w800),
+                  style: displayStyle(
+                      fontSize: compact ? 15 : 17, fontWeight: FontWeight.w800),
                 ),
               ],
             ),
@@ -300,71 +302,9 @@ class _RoomTopBar extends StatelessWidget {
   }
 }
 
-class _LeftRail extends StatelessWidget {
-  const _LeftRail({required this.session, required this.agendaIndex});
 
-  final RoomSession session;
-  final int agendaIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final participants = session.participants.isEmpty ? suggestedThinkers : session.participants;
-    return Column(
-      children: [
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('INVITED COUNCIL', style: _railTitle()),
-              const SizedBox(height: 14),
-              ...participants.take(5).map(
-                (mind) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      ThinkerAvatar(name: mind.name, size: 38, color: mind.color),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(mind.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: bodyStyle(fontWeight: FontWeight.w800, color: AgoraColors.ink)),
-                            Text(mind.role, style: bodyStyle(fontSize: 11.5, color: AgoraColors.mute)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('SESSION JOURNEY', style: _railTitle()),
-              const SizedBox(height: 14),
-              ...session.agenda.asMap().entries.map(
-                (entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: AgendaCard(item: entry.value, index: entry.key, active: entry.key == agendaIndex),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  TextStyle _railTitle() => bodyStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AgoraColors.mute).copyWith(letterSpacing: 1.3);
-}
-
-class _RightRail extends StatelessWidget {
-  const _RightRail({
+class _DetailsPanel extends StatelessWidget {
+  const _DetailsPanel({
     required this.session,
     required this.messages,
     required this.mode,
@@ -380,158 +320,151 @@ class _RightRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = messages.isEmpty ? null : messages.last;
-    final challenge = (0.18 + messages.where((m) => !m.isUser).length * 0.055).clamp(0.18, 0.86);
+    final participants =
+        session.participants.isEmpty ? suggestedThinkers : session.participants;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RoomMetricCard(
-          title: 'Speaking now',
+        Text(
+          'Details',
+          style: displayStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Participants',
+          style: bodyStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: AgoraColors.mute,
+          ).copyWith(letterSpacing: 1.2),
+        ),
+        const SizedBox(height: 12),
+        ...participants.take(6).map(
+              (mind) => Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  children: [
+                    ThinkerAvatar(
+                        name: mind.name, size: 40, color: mind.color),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mind.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyStyle(
+                                fontWeight: FontWeight.w800,
+                                color: AgoraColors.ink),
+                          ),
+                          Text(
+                            mind.description.isNotEmpty
+                                ? '${mind.role} · ${mind.description}'
+                                : mind.role,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyStyle(
+                                fontSize: 11.5, color: AgoraColors.mute),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
           child: Row(
             children: [
               ThinkerAvatar(
-                name: current?.speakerName ?? 'Room',
-                size: 44,
-                color: _currentColor(session, current),
-                dark: current?.isUser == true,
-                showInitial: current?.isUser == true,
-              ),
+                  name: 'You', size: 40, color: AgoraColors.ink, dark: true, showInitial: true),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      current?.speakerName ?? 'Room',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: bodyStyle(fontWeight: FontWeight.w800, color: AgoraColors.ink),
-                    ),
-                    Text(
-                      running ? 'thinking...' : (current?.role ?? 'listening...'),
-                      style: bodyStyle(fontSize: 12, color: AgoraColors.accent, fontWeight: FontWeight.w800),
-                    ),
+                    Text('You',
+                        style: bodyStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AgoraColors.ink)),
+                    Text('Builder',
+                        style: bodyStyle(
+                            fontSize: 11.5, color: AgoraColors.mute)),
                   ],
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 8),
+        const Divider(color: AgoraColors.hair),
         const SizedBox(height: 16),
-        RoomMetricCard(
-          title: 'Round',
-          child: Row(
-            children: [
-              Text('${(messages.length / 2).ceil()}', style: displayStyle(fontSize: 34, fontWeight: FontWeight.w800)),
-              Text(' / 8', style: bodyStyle(fontSize: 15, color: AgoraColors.mute, fontWeight: FontWeight.w800)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        RoomMetricCard(
-          title: 'Challenge score',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ProgressPill(value: challenge.toDouble()),
-              const SizedBox(height: 8),
-              Text('Higher = more disagreement', style: bodyStyle(fontSize: 12, color: AgoraColors.inkSoft)),
-            ],
-          ),
-        ),
+        const MemorySummaryCard(),
         const SizedBox(height: 16),
         SoftCard(
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Engine', style: displayStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              Text(
+                'ENGINE',
+                style: bodyStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AgoraColors.mute,
+                ).copyWith(letterSpacing: 1.1),
+              ),
               const SizedBox(height: 10),
               AgoraChip(
                 label: mode.label,
-                icon: mode == RoomMode.complex ? Icons.account_tree_outlined : Icons.short_text_rounded,
-                backgroundColor: mode == RoomMode.complex ? AgoraColors.sky : AgoraColors.lilac,
-                foregroundColor: mode == RoomMode.complex ? const Color(0xFF264FB1) : AgoraColors.violet,
-                borderColor: mode == RoomMode.complex ? const Color(0xFFCCDDF3) : const Color(0xFFE1D8F4),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                mode == RoomMode.complex
-                    ? 'Host chooses next speaker and sends one model call per turn.'
-                    : 'One model call drafts the whole room, then UI renders every turn.',
-                style: bodyStyle(fontSize: 12.5, color: AgoraColors.inkSoft, height: 1.42),
+                icon: mode == RoomMode.complex
+                    ? Icons.account_tree_outlined
+                    : Icons.short_text_rounded,
+                backgroundColor: mode == RoomMode.complex
+                    ? AgoraColors.sky
+                    : AgoraColors.lilac,
+                foregroundColor: mode == RoomMode.complex
+                    ? const Color(0xFF264FB1)
+                    : AgoraColors.violet,
+                borderColor: mode == RoomMode.complex
+                    ? const Color(0xFFCCDDF3)
+                    : const Color(0xFFE1D8F4),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: running ? null : onRun,
                 icon: running
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.play_arrow_rounded),
-                label: Text(mode == RoomMode.complex ? 'Run next turn' : 'Simulate room'),
+                label: Text(mode == RoomMode.complex
+                    ? 'Run next turn'
+                    : 'Simulate room'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AgoraColors.ink,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: AgoraColors.hair,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999)),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        const MemorySummaryCard(),
       ],
-    );
-  }
-
-  Color _currentColor(RoomSession session, AgoraMessage? current) {
-    if (current == null) return AgoraColors.accent;
-    if (current.isUser) return AgoraColors.ink;
-    final matches = session.participants.where((mind) => mind.id == current.speakerId);
-    if (matches.isEmpty) return AgoraColors.accent;
-    return matches.first.color;
-  }
-}
-
-class _MobileAgendaStrip extends StatelessWidget {
-  const _MobileAgendaStrip({required this.session, required this.agendaIndex});
-
-  final RoomSession session;
-  final int agendaIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 54,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (context, index) {
-          final item = session.agenda[index];
-          final active = index == agendaIndex;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.white.withOpacity(0.68),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: active ? AgoraColors.accent.withOpacity(0.5) : AgoraColors.hair),
-            ),
-            child: Row(
-              children: [
-                Text('${index + 1}', style: bodyStyle(fontSize: 12, fontWeight: FontWeight.w800, color: active ? AgoraColors.accent : AgoraColors.mute)),
-                const SizedBox(width: 6),
-                Text(item.title, style: bodyStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AgoraColors.ink)),
-              ],
-            ),
-          );
-        },
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemCount: session.agenda.length,
-      ),
     );
   }
 }
 
 class _ComposerBar extends StatelessWidget {
   const _ComposerBar({
+    required this.session,
+    required this.agendaIndex,
     required this.controller,
     required this.running,
     required this.mode,
@@ -540,6 +473,8 @@ class _ComposerBar extends StatelessWidget {
     required this.onRun,
   });
 
+  final RoomSession session;
+  final int agendaIndex;
   final TextEditingController controller;
   final bool running;
   final RoomMode mode;
@@ -550,7 +485,8 @@ class _ComposerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 14),
+      padding: EdgeInsets.fromLTRB(
+          16, 10, 16, MediaQuery.of(context).padding.bottom + 14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.96),
         border: const Border(top: BorderSide(color: AgoraColors.hair)),
@@ -569,7 +505,11 @@ class _ComposerBar extends StatelessWidget {
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text(error!, maxLines: 2, overflow: TextOverflow.ellipsis, style: bodyStyle(fontSize: 12, color: const Color(0xFFB23A66))),
+              child: Text(error!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      bodyStyle(fontSize: 12, color: const Color(0xFFB23A66))),
             ),
           Row(
             children: [
@@ -580,7 +520,8 @@ class _ComposerBar extends StatelessWidget {
                   maxLines: 3,
                   decoration: const InputDecoration(
                     hintText: 'Ask the room or add context...',
-                    prefixIcon: Icon(Icons.keyboard_rounded, size: 18, color: AgoraColors.mute),
+                    prefixIcon: Icon(Icons.keyboard_rounded,
+                        size: 18, color: AgoraColors.mute),
                   ),
                   onSubmitted: (_) => onSend(),
                 ),
@@ -588,28 +529,141 @@ class _ComposerBar extends StatelessWidget {
               const SizedBox(width: 10),
               IconButton.filled(
                 onPressed: onSend,
-                style: IconButton.styleFrom(backgroundColor: AgoraColors.ink, foregroundColor: Colors.white),
+                style: IconButton.styleFrom(
+                    backgroundColor: AgoraColors.ink,
+                    foregroundColor: Colors.white),
                 icon: const Icon(Icons.arrow_upward_rounded),
               ),
               const SizedBox(width: 10),
               FilledButton.icon(
                 onPressed: running ? null : onRun,
                 icon: running
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(mode == RoomMode.complex ? Icons.skip_next_rounded : Icons.auto_awesome_rounded),
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(mode == RoomMode.complex
+                        ? Icons.skip_next_rounded
+                        : Icons.auto_awesome_rounded),
                 label: Text(mode == RoomMode.complex ? 'Next' : 'Simulate'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AgoraColors.accent,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: AgoraColors.hair,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                 ),
               ),
             ],
           ),
+          if (session.agenda.isNotEmpty) ...[  
+            const SizedBox(height: 10),
+            _AgendaProgressBar(
+                session: session, agendaIndex: agendaIndex),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _AgendaProgressBar extends StatelessWidget {
+  const _AgendaProgressBar({
+    required this.session,
+    required this.agendaIndex,
+  });
+
+  final RoomSession session;
+  final int agendaIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = session.agenda;
+    final count = items.length;
+    if (count == 0) return const SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (int i = 0; i < count; i++) ...[  
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 3,
+                            color: i <= agendaIndex
+                                ? AgoraColors.ink
+                                : AgoraColors.hair,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: i <= agendaIndex
+                                ? AgoraColors.ink
+                                : Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: i <= agendaIndex
+                                  ? AgoraColors.ink
+                                  : AgoraColors.hair,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${i + 1}',
+                              style: bodyStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: i <= agendaIndex
+                                    ? Colors.white
+                                    : AgoraColors.inkSoft,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            items[i].title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyStyle(
+                              fontSize: 11,
+                              fontWeight: i == agendaIndex
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color: i == agendaIndex
+                                  ? AgoraColors.ink
+                                  : AgoraColors.inkSoft,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
