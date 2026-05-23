@@ -89,12 +89,6 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
     });
   }
 
-  RoomSession _draftSessionWithAllThinkers() {
-    final base = _session ?? demoRoomFallback;
-    final pool = _allThinkers.isEmpty ? base.participants : _allThinkers;
-    return base.copyWith(participants: pool);
-  }
-
   void _disposeAgendaControllers() {
     for (final controller in _agendaTitleControllers) {
       controller.dispose();
@@ -118,9 +112,27 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
     });
   }
 
+  /// Build the frozen participant list for the new room session.
+  /// Priority: live store profile (full persona) > session snapshot fallback.
+  /// This makes each room self-contained — future edits/deletions in the
+  /// Thinkers tab don't affect rooms that have already started.
+  List<MindProfile> _resolveParticipants(RoomSession base) {
+    final liveById = {for (final t in _allThinkers) t.id: t};
+    final snapshotById = {for (final t in base.participants) t.id: t};
+    final resolved = _selectedMindIds
+        .map((id) => liveById[id] ?? snapshotById[id])
+        .whereType<MindProfile>()
+        .toList();
+    if (resolved.isNotEmpty) return resolved;
+    // Nothing selected — fall back to first live thinker or first snapshot.
+    return [
+      if (_allThinkers.isNotEmpty) _allThinkers.first
+      else if (base.participants.isNotEmpty) base.participants.first,
+    ];
+  }
+
   RoomSession _draftSession() {
     final base = _session ?? demoRoomFallback;
-    final pool = _allThinkers.isEmpty ? base.participants : _allThinkers;
     final agenda = <AgendaItem>[];
     for (var i = 0; i < base.agenda.length; i++) {
       final title = _agendaTitleControllers[i].text.trim();
@@ -131,8 +143,6 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
         question: question.isEmpty ? base.agenda[i].question : question,
       ));
     }
-    final selectedParticipants =
-        pool.where((mind) => _selectedMindIds.contains(mind.id)).toList();
     return base.copyWith(
       id: 'room_draft_${DateTime.now().microsecondsSinceEpoch}',
       topic: _topicController.text.trim().isEmpty
@@ -143,9 +153,7 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
           : _backgroundController.text.trim(),
       runtimeMode: _mode.label,
       agenda: agenda.isEmpty ? base.agenda : agenda,
-      participants: selectedParticipants.isEmpty
-          ? pool.take(1).toList()
-          : selectedParticipants,
+      participants: _resolveParticipants(base),
       updatedAt: DateTime.now(),
     );
   }
