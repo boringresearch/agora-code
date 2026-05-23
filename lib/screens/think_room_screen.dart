@@ -81,11 +81,9 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
       _agendaQuestionControllers
           .add(TextEditingController(text: item.question));
     }
-    final participants =
-        session.participants.isEmpty ? suggestedThinkers : session.participants;
     setState(() {
-      _session = session.copyWith(participants: participants);
-      _selectedMindIds = participants.take(4).map((mind) => mind.id).toSet();
+      _session = session;
+      _selectedMindIds = {};
     });
   }
 
@@ -104,7 +102,7 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
     setState(() {
       final next = Set<String>.from(_selectedMindIds);
       if (next.contains(mind.id)) {
-        if (next.length > 1) next.remove(mind.id);
+        next.remove(mind.id);
       } else {
         next.add(mind.id);
       }
@@ -116,19 +114,12 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   /// Priority: live store profile (full persona) > session snapshot fallback.
   /// This makes each room self-contained — future edits/deletions in the
   /// Thinkers tab don't affect rooms that have already started.
-  List<MindProfile> _resolveParticipants(RoomSession base) {
+  List<MindProfile> _resolveParticipants() {
     final liveById = {for (final t in _allThinkers) t.id: t};
-    final snapshotById = {for (final t in base.participants) t.id: t};
-    final resolved = _selectedMindIds
-        .map((id) => liveById[id] ?? snapshotById[id])
+    return _selectedMindIds
+        .map((id) => liveById[id])
         .whereType<MindProfile>()
         .toList();
-    if (resolved.isNotEmpty) return resolved;
-    // Nothing selected — fall back to first live thinker or first snapshot.
-    return [
-      if (_allThinkers.isNotEmpty) _allThinkers.first
-      else if (base.participants.isNotEmpty) base.participants.first,
-    ];
   }
 
   RoomSession _draftSession() {
@@ -153,12 +144,23 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
           : _backgroundController.text.trim(),
       runtimeMode: _mode.label,
       agenda: agenda.isEmpty ? base.agenda : agenda,
-      participants: _resolveParticipants(base),
+      participants: _resolveParticipants(),
       updatedAt: DateTime.now(),
     );
   }
 
-  void _begin() => widget.onBegin(_mode, _draftSession());
+  void _begin() {
+    if (_selectedMindIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select at least one thinker to begin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    widget.onBegin(_mode, _draftSession());
+  }
 
   @override
   Widget build(BuildContext context) {
