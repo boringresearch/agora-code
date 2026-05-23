@@ -44,6 +44,15 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  void _openPlanner() {
+    setState(() {
+      _selected = AppSection.think;
+      _liveRoomOpen = false;
+      _draftSession = null;
+      _oneToOneMind = null;
+    });
+  }
+
   void _openRoom([RoomMode mode = RoomMode.complex, RoomSession? session]) {
     setState(() {
       _selected = AppSection.think;
@@ -116,11 +125,11 @@ class _AppShellState extends State<AppShell> {
     return switch (_selected) {
       AppSection.home => HomeScreen(
           store: widget.store,
-          onOpenRoom: () => _openRoom(RoomMode.complex),
+          onOpenRoom: _openPlanner,
         ),
       AppSection.meetings => MeetingsScreen(
           store: widget.store,
-          onNewRoom: () => _openRoom(_roomMode),
+          onNewRoom: _openPlanner,
           onOpenRoom: _openSavedRoom),
       AppSection.think => _liveRoomOpen
           ? LiveRoomScreen(
