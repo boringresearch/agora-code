@@ -102,6 +102,11 @@ class SqfliteLocalStore implements LocalStore {
   }
 
   @override
+  Future<void> deleteSession(String sessionId) async {
+    await db.delete('rooms', where: 'id = ?', whereArgs: [sessionId]);
+  }
+
+  @override
   Future<void> saveMessage(String roomId, AgoraMessage message) async {
     await db.insert(
       'messages',

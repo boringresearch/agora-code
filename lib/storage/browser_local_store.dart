@@ -45,6 +45,14 @@ class BrowserLocalStore implements LocalStore {
   }
 
   @override
+  Future<void> deleteSession(String sessionId) async {
+    final rows = _readRows(_roomsKey)
+      ..removeWhere((item) => item['id'] == sessionId);
+    _writeRows(_roomsKey, rows);
+    html.window.localStorage.remove(_messagesKey(sessionId));
+  }
+
+  @override
   Future<void> saveMessage(String roomId, AgoraMessage message) async {
     final key = _messagesKey(roomId);
     final rows = _readRows(key);
