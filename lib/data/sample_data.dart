@@ -1,7 +1,86 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../theme/agora_theme.dart';
+
+const kCustomThinkersKey = 'one_to_one.custom_thinkers.v1';
+const kDeletedThinkersKey = 'one_to_one.deleted_thinkers.v1';
+
+List<MindProfile> buildAllThinkers({
+  List<MindProfile> customThinkers = const [],
+  Set<String> deletedIds = const {},
+}) {
+  const monet = MindProfile(
+    id: 'monet',
+    name: 'Monet',
+    handle: '@monet',
+    role: 'Advocate',
+    description:
+        'Use a creative lens to design for clarity, reflection, and atmosphere rather than raw consumption.',
+    color: AgoraColors.violet,
+  );
+  final byId = <String, MindProfile>{
+    monet.id: monet,
+    for (final t in railThinkers) t.id: t,
+    for (final t in suggestedThinkers) t.id: t,
+    for (final t in customThinkers) t.id: t,
+  };
+  return byId.values.where((t) => !deletedIds.contains(t.id)).toList();
+}
+
+List<MindProfile> decodeThinkersSetting(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return const [];
+  try {
+    final decoded = jsonDecode(raw);
+    final rows = decoded is List ? decoded : [decoded];
+    return rows
+        .whereType<Map>()
+        .map((row) => _thinkerFromMap(Map<String, dynamic>.from(row)))
+        .toList();
+  } catch (_) {
+    return const [];
+  }
+}
+
+Set<String> decodeStringSet(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return const {};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const {};
+    return decoded.map((item) => item.toString()).toSet();
+  } catch (_) {
+    return const {};
+  }
+}
+
+MindProfile _thinkerFromMap(Map<String, dynamic> json) {
+  final name = (json['name'] ?? '').toString().trim();
+  final id = (json['id'] ?? '').toString().trim();
+  final handle = (json['handle'] ?? '@$id').toString();
+  final role = (json['role'] ?? 'Custom thinker').toString();
+  final description = (json['description'] ?? '').toString();
+  final persona = (json['prompt'] ?? json['persona'] ?? '').toString();
+  final colorRaw = json['color'];
+  Color color = AgoraColors.accent;
+  if (colorRaw is int) {
+    color = Color(colorRaw);
+  } else if (colorRaw is String && colorRaw.startsWith('#')) {
+    final hex = colorRaw.substring(1);
+    final parsed = int.tryParse(hex.length == 6 ? 'ff$hex' : hex, radix: 16);
+    if (parsed != null) color = Color(parsed);
+  }
+  return MindProfile(
+    id: id.isEmpty ? name.toLowerCase().replaceAll(' ', '_') : id,
+    name: name,
+    handle: handle,
+    role: role,
+    description: description,
+    persona: persona,
+    color: color,
+  );
+}
 
 const railThinkers = <MindProfile>[
   MindProfile(

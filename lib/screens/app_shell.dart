@@ -130,7 +130,7 @@ class _AppShellState extends State<AppShell> {
               chatClient: widget.chatClient,
               onBackToPlanner: () => setState(() => _liveRoomOpen = false),
             )
-          : ThinkRoomScreen(onBegin: _openRoom),
+          : ThinkRoomScreen(store: widget.store, onBegin: _openRoom),
       AppSection.selfReflection => const PlaceholderScreen(
           title: 'Self-reflection',
           subtitle:

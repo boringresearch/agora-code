@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/room_data_loader.dart';
 import '../data/sample_data.dart';
 import '../models/models.dart';
+import '../storage/local_store.dart';
 import '../theme/agora_theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/chip.dart';
@@ -10,8 +11,9 @@ import '../widgets/room_widgets.dart';
 import '../widgets/soft_card.dart';
 
 class ThinkRoomScreen extends StatefulWidget {
-  const ThinkRoomScreen({super.key, required this.onBegin});
+  const ThinkRoomScreen({super.key, required this.store, required this.onBegin});
 
+  final LocalStore store;
   final void Function(RoomMode mode, RoomSession session) onBegin;
 
   @override
@@ -26,12 +28,15 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
   final List<TextEditingController> _agendaTitleControllers = [];
   final List<TextEditingController> _agendaQuestionControllers = [];
   Set<String> _selectedMindIds = {};
+  List<MindProfile> _allThinkers = const [];
+  bool _thinkersLoading = true;
 
   @override
   void initState() {
     super.initState();
     _setDraft(demoRoomFallback);
     _loadDraft();
+    _loadThinkers();
   }
 
   @override
@@ -40,6 +45,19 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
     _backgroundController.dispose();
     _disposeAgendaControllers();
     super.dispose();
+  }
+
+  Future<void> _loadThinkers() async {
+    final customRaw = await widget.store.readSetting(kCustomThinkersKey);
+    final deletedRaw = await widget.store.readSetting(kDeletedThinkersKey);
+    if (!mounted) return;
+    final customThinkers = decodeThinkersSetting(customRaw);
+    final deletedIds = decodeStringSet(deletedRaw);
+    setState(() {
+      _allThinkers = buildAllThinkers(
+          customThinkers: customThinkers, deletedIds: deletedIds);
+      _thinkersLoading = false;
+    });
   }
 
   Future<void> _loadDraft() async {
@@ -71,6 +89,12 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
     });
   }
 
+  RoomSession _draftSessionWithAllThinkers() {
+    final base = _session ?? demoRoomFallback;
+    final pool = _allThinkers.isEmpty ? base.participants : _allThinkers;
+    return base.copyWith(participants: pool);
+  }
+
   void _disposeAgendaControllers() {
     for (final controller in _agendaTitleControllers) {
       controller.dispose();
@@ -96,6 +120,7 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
 
   RoomSession _draftSession() {
     final base = _session ?? demoRoomFallback;
+    final pool = _allThinkers.isEmpty ? base.participants : _allThinkers;
     final agenda = <AgendaItem>[];
     for (var i = 0; i < base.agenda.length; i++) {
       final title = _agendaTitleControllers[i].text.trim();
@@ -106,9 +131,8 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
         question: question.isEmpty ? base.agenda[i].question : question,
       ));
     }
-    final selectedParticipants = base.participants
-        .where((mind) => _selectedMindIds.contains(mind.id))
-        .toList();
+    final selectedParticipants =
+        pool.where((mind) => _selectedMindIds.contains(mind.id)).toList();
     return base.copyWith(
       id: 'room_draft_${DateTime.now().microsecondsSinceEpoch}',
       topic: _topicController.text.trim().isEmpty
@@ -120,7 +144,7 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
       runtimeMode: _mode.label,
       agenda: agenda.isEmpty ? base.agenda : agenda,
       participants: selectedParticipants.isEmpty
-          ? base.participants.take(1).toList()
+          ? pool.take(1).toList()
           : selectedParticipants,
       updatedAt: DateTime.now(),
     );
@@ -174,7 +198,8 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
                           if (!showRightRail) ...[
                             const SizedBox(height: 18),
                             _ThinkRoomRightRail(
-                              session: session,
+                              allThinkers: _allThinkers,
+                              loading: _thinkersLoading,
                               selectedMindIds: _selectedMindIds,
                               onToggleMind: _toggleMind,
                               onBegin: _begin,
@@ -189,14 +214,12 @@ class _ThinkRoomScreenState extends State<ThinkRoomScreen> {
               if (showRightRail)
                 SizedBox(
                   width: 318,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(0, 22, 20, 110),
-                    child: _ThinkRoomRightRail(
-                      session: session,
-                      selectedMindIds: _selectedMindIds,
-                      onToggleMind: _toggleMind,
-                      onBegin: _begin,
-                    ),
+                  child: _ThinkRoomRightRail(
+                    allThinkers: _allThinkers,
+                    loading: _thinkersLoading,
+                    selectedMindIds: _selectedMindIds,
+                    onToggleMind: _toggleMind,
+                    onBegin: _begin,
                   ),
                 ),
             ],
@@ -561,88 +584,201 @@ class _EditableAgendaCard extends StatelessWidget {
   }
 }
 
-class _ThinkRoomRightRail extends StatelessWidget {
+class _ThinkRoomRightRail extends StatefulWidget {
   const _ThinkRoomRightRail({
-    required this.session,
+    required this.allThinkers,
+    required this.loading,
     required this.selectedMindIds,
     required this.onToggleMind,
     required this.onBegin,
   });
 
-  final RoomSession session;
+  final List<MindProfile> allThinkers;
+  final bool loading;
   final Set<String> selectedMindIds;
   final ValueChanged<MindProfile> onToggleMind;
   final VoidCallback onBegin;
 
   @override
+  State<_ThinkRoomRightRail> createState() => _ThinkRoomRightRailState();
+}
+
+class _ThinkRoomRightRailState extends State<_ThinkRoomRightRail> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(
+        () => setState(() => _query = _searchController.text.trim()));
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<MindProfile> get _filtered {
+    final thinkers =
+        widget.allThinkers.isEmpty ? suggestedThinkers : widget.allThinkers;
+    if (_query.isEmpty) return thinkers;
+    final q = _query.toLowerCase();
+    return thinkers
+        .where((t) =>
+            t.name.toLowerCase().contains(q) ||
+            t.role.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final participants =
-        session.participants.isEmpty ? suggestedThinkers : session.participants;
-    return Column(
-      children: [
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Suggested thinkers',
-                  style:
-                      displayStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              Text(
-                'Invite minds that disagree productively. The host will manage rhythm, turn-taking, and summaries.',
-                style: bodyStyle(
-                    fontSize: 12.8, color: AgoraColors.inkSoft, height: 1.38),
-              ),
-              const SizedBox(height: 14),
-              ...participants.take(5).map(
+    final filtered = _filtered;
+    final selectedCount = widget.selectedMindIds.length;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(0, 22, 20, 110),
+      child: Column(
+        children: [
+          SoftCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Thinkers',
+                          style: displayStyle(
+                              fontSize: 16, fontWeight: FontWeight.w800)),
+                    ),
+                    if (selectedCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AgoraColors.ink,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$selectedCount selected',
+                          style: bodyStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Invite minds that disagree productively.',
+                  style: bodyStyle(
+                      fontSize: 12.5,
+                      color: AgoraColors.inkSoft,
+                      height: 1.35),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search thinkers...',
+                    hintStyle:
+                        bodyStyle(fontSize: 13, color: AgoraColors.mute),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        size: 18, color: AgoraColors.mute),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            onPressed: _searchController.clear,
+                            color: AgoraColors.mute,
+                          ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    isDense: true,
+                    filled: true,
+                    fillColor: AgoraColors.canvas,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: AgoraColors.hair, width: 1.5),
+                    ),
+                  ),
+                  style: bodyStyle(fontSize: 13, color: AgoraColors.ink),
+                ),
+                const SizedBox(height: 10),
+                if (widget.loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text('No thinkers found.',
+                        style:
+                            bodyStyle(fontSize: 13, color: AgoraColors.mute)),
+                  )
+                else
+                  ...filtered.map(
                     (mind) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: 6),
                       child: _SelectableThinker(
                         mind: mind,
-                        selected: selectedMindIds.contains(mind.id),
-                        onTap: () => onToggleMind(mind),
+                        selected: widget.selectedMindIds.contains(mind.id),
+                        onTap: () => widget.onToggleMind(mind),
                       ),
                     ),
                   ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 18),
-        SoftCard(
-          backgroundColor: AgoraColors.ink,
-          borderColor: AgoraColors.ink,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Two engines, one UI',
-                  style: displayStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white)),
-              const SizedBox(height: 8),
-              Text(
-                'Switch between turn-by-turn orchestration and full prompt simulation. Both render as the same live room.',
-                style: bodyStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.74),
-                    height: 1.45),
-              ),
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: onBegin,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Start now'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AgoraColors.ink,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999)),
+          const SizedBox(height: 18),
+          SoftCard(
+            backgroundColor: AgoraColors.ink,
+            borderColor: AgoraColors.ink,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Two engines, one UI',
+                    style: displayStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+                const SizedBox(height: 8),
+                Text(
+                  'Switch between turn-by-turn orchestration and full prompt simulation. Both render as the same live room.',
+                  style: bodyStyle(
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.74),
+                      height: 1.45),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: widget.onBegin,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Start now'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AgoraColors.ink,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999)),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -658,40 +794,49 @@ class _SelectableThinker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AgoraColors.canvas : Colors.white,
+      color: selected
+          ? AgoraColors.ink.withValues(alpha: 0.05)
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
-              ThinkerAvatar(name: mind.name, size: 42, color: mind.color),
+              ThinkerAvatar(name: mind.name, size: 40, color: mind.color),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(mind.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: bodyStyle(
                             fontWeight: FontWeight.w800,
                             color: AgoraColors.ink)),
                     Text(
-                      mind.role,
+                      mind.description.isNotEmpty
+                          ? '${mind.role} · ${mind.description}'
+                          : mind.role,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: bodyStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           color: AgoraColors.mute,
-                          fontWeight: FontWeight.w700),
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Icon(
                 selected
                     ? Icons.check_circle_rounded
                     : Icons.radio_button_unchecked_rounded,
-                color: selected ? AgoraColors.green : AgoraColors.mute,
+                color: selected ? AgoraColors.green : AgoraColors.hair,
                 size: 20,
               ),
             ],
