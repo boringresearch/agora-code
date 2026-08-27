@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../data/sample_data.dart';
 import '../llm/llm_client.dart';
 import '../models/models.dart';
+import '../storage/file_thinker_store.dart';
 import '../storage/local_store.dart';
 import '../theme/agora_theme.dart';
 import '../widgets/avatar.dart';
@@ -29,6 +29,7 @@ class ThinkersScreen extends StatefulWidget {
 
 class _ThinkersScreenState extends State<ThinkersScreen> {
   final _searchController = TextEditingController();
+  final _fileStore = FileThinkerStore();
   List<MindProfile> _customThinkers = const [];
   Set<String> _deletedThinkerIds = const {};
   String _searchQuery = '';
@@ -40,7 +41,7 @@ class _ThinkersScreenState extends State<ThinkersScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim());
     });
-    _loadCustomThinkers();
+    _initAndLoad();
   }
 
   @override
@@ -49,33 +50,26 @@ class _ThinkersScreenState extends State<ThinkersScreen> {
     super.dispose();
   }
 
+  Future<void> _initAndLoad() async {
+    await _fileStore.init();
+    await _loadCustomThinkers();
+  }
+
   Future<void> _loadCustomThinkers() async {
-    final raw = await widget.store.readSetting(_customThinkersKey);
-    final deletedRaw = await widget.store.readSetting(_deletedThinkersKey);
+    final thinkers = await _fileStore.listThinkers();
+    final deletedIds = await _fileStore.getDeletedIds();
     if (!mounted) return;
     setState(() {
-      _customThinkers = _decodeThinkers(raw);
-      _deletedThinkerIds = _decodeStringSet(deletedRaw);
+      _customThinkers = thinkers;
+      _deletedThinkerIds = deletedIds;
       _loading = false;
     });
   }
 
-  Future<void> _saveCustomThinkers(List<MindProfile> thinkers) async {
-    await widget.store.saveSetting(
-      _customThinkersKey,
-      jsonEncode(thinkers.map(_thinkerToStoredJson).toList()),
-    );
-    if (!mounted) return;
-    setState(() => _customThinkers = thinkers);
-  }
-
   Future<void> _addThinker(MindProfile thinker) async {
-    final next = _upsertThinkers(_customThinkers, [thinker]);
-    final nextDeleted = {..._deletedThinkerIds}..remove(thinker.id);
-    await _saveCustomThinkers(next);
-    await widget.store
-        .saveSetting(_deletedThinkersKey, jsonEncode(nextDeleted.toList()));
-    if (mounted) setState(() => _deletedThinkerIds = nextDeleted);
+    await _fileStore.saveThinker(thinker);
+    await _fileStore.clearDeletedIds();
+    await _loadCustomThinkers();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -87,14 +81,11 @@ class _ThinkersScreenState extends State<ThinkersScreen> {
   }
 
   Future<void> _importThinkers(List<MindProfile> thinkers) async {
-    final next = _upsertThinkers(_customThinkers, thinkers);
-    final incomingIds = thinkers.map((thinker) => thinker.id).toSet();
-    final nextDeleted = {..._deletedThinkerIds}
-      ..removeWhere(incomingIds.contains);
-    await _saveCustomThinkers(next);
-    await widget.store
-        .saveSetting(_deletedThinkersKey, jsonEncode(nextDeleted.toList()));
-    if (mounted) setState(() => _deletedThinkerIds = nextDeleted);
+    for (final thinker in thinkers) {
+      await _fileStore.saveThinker(thinker);
+    }
+    await _fileStore.clearDeletedIds();
+    await _loadCustomThinkers();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -112,7 +103,7 @@ class _ThinkersScreenState extends State<ThinkersScreen> {
       builder: (context) => AlertDialog(
         title: Text('Delete ${thinker.name}?'),
         content: const Text(
-          'This removes the thinker from the Thinkers tab and deletes their local chat history.',
+          'This removes the thinker from the Thinkers tab and deletes their file.',
         ),
         actions: [
           TextButton(
@@ -132,29 +123,53 @@ class _ThinkersScreenState extends State<ThinkersScreen> {
     );
     if (confirmed != true) return;
 
-    final nextCustom = _customThinkers
-        .where((item) => item.id != thinker.id)
-        .toList(growable: false);
-    final nextDeleted = {..._deletedThinkerIds, thinker.id};
-    await widget.store.saveSetting(
-      _customThinkersKey,
-      jsonEncode(nextCustom.map(_thinkerToStoredJson).toList()),
-    );
-    await widget.store.saveSetting(
-      _deletedThinkersKey,
-      jsonEncode(nextDeleted.toList()),
-    );
+    await _fileStore.deleteThinker(thinker.id);
     await _deleteThinkerLocalData(widget.store, thinker);
+    await _loadCustomThinkers();
     if (!mounted) return;
-    setState(() {
-      _customThinkers = nextCustom;
-      _deletedThinkerIds = nextDeleted;
-    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${thinker.name} deleted.'),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(milliseconds: 1400),
+      ),
+    );
+  }
+
+  Future<void> _clearDeletedThinkers() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restore all deleted thinkers?'),
+        content: Text(
+          'This will restore ${_deletedThinkerIds.length} deleted thinker(s) to the list.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AgoraColors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await _fileStore.clearDeletedIds();
+    await _loadCustomThinkers();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('All deleted thinkers restored.'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(milliseconds: 1400),
       ),
     );
   }
@@ -211,6 +226,14 @@ class _ThinkersScreenState extends State<ThinkersScreen> {
                         foregroundColor: Colors.white,
                       ),
                     ),
+                    if (_deletedThinkerIds.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      IconButton(
+                        onPressed: _clearDeletedThinkers,
+                        icon: const Icon(Icons.restore_from_trash_outlined),
+                        tooltip: 'Restore ${_deletedThinkerIds.length} deleted',
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -540,6 +563,7 @@ class _DialogField extends StatelessWidget {
         TextField(
           controller: controller,
           maxLines: maxLines,
+          textAlignVertical: TextAlignVertical.top,
           decoration: InputDecoration(hintText: hintText),
           style: bodyStyle(fontSize: 14, color: AgoraColors.ink),
         ),
@@ -2263,9 +2287,6 @@ List<String> _themesFor(MindProfile thinker) {
   };
 }
 
-const _customThinkersKey = 'one_to_one.custom_thinkers.v1';
-const _deletedThinkersKey = 'one_to_one.deleted_thinkers.v1';
-
 const _thinkerPalette = <Color>[
   AgoraColors.accent,
   AgoraColors.violet,
@@ -2301,44 +2322,12 @@ List<MindProfile> _oneToOneThinkers({
   List<MindProfile> customThinkers = const [],
   Set<String> deletedThinkerIds = const {},
 }) {
-  const monet = MindProfile(
-    id: 'monet',
-    name: 'Monet',
-    handle: '@monet',
-    role: 'Advocate',
-    description:
-        'Use a creative lens to design for clarity, reflection, and atmosphere rather than raw consumption.',
-    color: AgoraColors.violet,
-  );
   final byId = <String, MindProfile>{
-    monet.id: monet,
-    for (final thinker in railThinkers) thinker.id: thinker,
-    for (final thinker in suggestedThinkers) thinker.id: thinker,
     for (final thinker in customThinkers) thinker.id: thinker,
   };
   return byId.values
       .where((thinker) => !deletedThinkerIds.contains(thinker.id))
       .toList();
-}
-
-List<MindProfile> _decodeThinkers(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return const [];
-  try {
-    return _parseImportedThinkers(raw);
-  } catch (_) {
-    return const [];
-  }
-}
-
-Set<String> _decodeStringSet(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return const {};
-  try {
-    final decoded = jsonDecode(raw);
-    if (decoded is! List) return const {};
-    return decoded.map((item) => item.toString()).toSet();
-  } catch (_) {
-    return const {};
-  }
 }
 
 Future<void> _deleteThinkerLocalData(
@@ -2386,30 +2375,6 @@ MindProfile _thinkerFromImport(Map<String, dynamic> json) {
     persona: prompt,
     color: _colorFromValue(json['color'], id),
   );
-}
-
-Map<String, dynamic> _thinkerToStoredJson(MindProfile thinker) {
-  return {
-    'id': thinker.id,
-    'name': thinker.name,
-    'handle': thinker.handle,
-    'role': thinker.role,
-    'description': thinker.description,
-    'prompt': thinker.persona,
-    'color':
-        '#${thinker.color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
-  };
-}
-
-List<MindProfile> _upsertThinkers(
-    List<MindProfile> current, List<MindProfile> incoming) {
-  final byId = <String, MindProfile>{
-    for (final thinker in current) thinker.id: thinker
-  };
-  for (final thinker in incoming) {
-    byId[thinker.id] = thinker;
-  }
-  return byId.values.toList();
 }
 
 String _stringValue(Object? value) => value?.toString().trim() ?? '';

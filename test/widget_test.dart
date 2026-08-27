@@ -147,4 +147,10 @@ class _FakeLocalStore implements LocalStore {
   Future<void> deleteFeedPost(String postId) async {
     storedFeedPosts.removeWhere((post) => post.id == postId);
   }
+
+  @override
+  Future<void> deleteSession(String sessionId) async {
+    sessions.removeWhere((session) => session.id == sessionId);
+    messages.remove(sessionId);
+  }
 }
